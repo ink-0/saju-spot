@@ -23,8 +23,8 @@ export default function Home() {
     const m = parseInt(month);
     const d = parseInt(day);
 
-    if (!y || y < 1900 || y > 2024) {
-      setError('올바른 연도를 입력해주세요 (1900~2024)');
+    if (!y || y < 1900 || y > 2026) {
+      setError('올바른 연도를 입력해주세요 (1900~2026)');
       return;
     }
     if (!m || m < 1 || m > 12) {
@@ -133,7 +133,7 @@ export default function Home() {
               onChange={(e) => setYear(e.target.value)}
               className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder-gray-600 focus:outline-none focus:border-amber-500/60 transition-all text-lg"
               min="1900"
-              max="2024"
+              max="2026"
             />
           </div>
 

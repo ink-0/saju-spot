@@ -1,7 +1,10 @@
 import { Suspense } from 'react';
-import ResultPage from './page';
 
-export default function ResultLayout() {
+export default function ResultLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <Suspense
       fallback={
@@ -13,7 +16,7 @@ export default function ResultLayout() {
         </main>
       }
     >
-      <ResultPage />
+      {children}
     </Suspense>
   );
 }
