@@ -1,8 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { calcSajuPalja, countOhangFromSaju, type SajuPaljaResult } from '@/lib/manseryeok';
+import {
+  calcSajuPalja,
+  countOhangFromSaju,
+  CHUNGGAN_OHANG,
+  JIJI_OHANG,
+  type SajuPaljaResult,
+} from '@/lib/manseryeok';
 import {
   analyzeOhang,
   type OhangAnalysis,
@@ -21,19 +27,22 @@ import {
   type Spot,
 } from '@/lib/spots';
 import type { OhangType } from '@/lib/ohang';
+import { analyzeSajuDetails, type SajuDetailAnalysis } from '@/lib/saju-analysis';
 
 export default function ResultPage() {
   const params = useSearchParams();
   const router = useRouter();
 
-  const [result, setResult] = useState<SajuPaljaResult | null>(null);
-  const [analysis, setAnalysis] = useState<OhangAnalysis | null>(null);
-  const [spots, setSpots] = useState<OhangSpots[]>([]);
-  const [avoidSpots, setAvoidSpots] = useState<OhangSpots[]>([]);
   const [ready, setReady] = useState(false);
-  const [calcError, setCalcError] = useState('');
-
-  useEffect(() => {
+  const calculation = useMemo<{
+    result: SajuPaljaResult | null;
+    analysis: OhangAnalysis | null;
+    detailAnalysis: SajuDetailAnalysis | null;
+    spots: OhangSpots[];
+    avoidSpots: OhangSpots[];
+    calcError: string;
+    shouldRedirect: boolean;
+  }>(() => {
     try {
       const calendarType = (params.get('calendarType') || 'solar') as 'solar' | 'lunar';
       const year = parseInt(params.get('year') || '0');
@@ -45,8 +54,15 @@ export default function ResultPage() {
       const isLeapMonth = params.get('isLeapMonth') === 'true';
 
       if (!year || !month || !day) {
-        router.push('/');
-        return;
+        return {
+          result: null,
+          analysis: null,
+          detailAnalysis: null,
+          spots: [],
+          avoidSpots: [],
+          calcError: '',
+          shouldRedirect: true,
+        };
       }
 
       const paljaResult = calcSajuPalja({
@@ -62,16 +78,47 @@ export default function ResultPage() {
 
       const counts = countOhangFromSaju(paljaResult.saju);
       const analysisResult = analyzeOhang(counts);
+      const detailResult = analyzeSajuDetails(paljaResult.saju);
 
-      setResult(paljaResult);
-      setAnalysis(analysisResult);
-      setSpots(getRecommendedSpots(analysisResult.lacking));
-      setAvoidSpots(getAvoidanceSpots(analysisResult.excess));
-      setTimeout(() => setReady(true), 100);
+      return {
+        result: paljaResult,
+        analysis: analysisResult,
+        detailAnalysis: detailResult,
+        spots: getRecommendedSpots(analysisResult.lacking),
+        avoidSpots: getAvoidanceSpots(analysisResult.excess),
+        calcError: '',
+        shouldRedirect: false,
+      };
     } catch (err) {
-      setCalcError(`계산 오류: ${err instanceof Error ? err.message : '알 수 없는 오류'}`);
+      return {
+        result: null,
+        analysis: null,
+        detailAnalysis: null,
+        spots: [],
+        avoidSpots: [],
+        calcError: `계산 오류: ${err instanceof Error ? err.message : '알 수 없는 오류'}`,
+        shouldRedirect: false,
+      };
     }
-  }, [params, router]);
+  }, [params]);
+
+  useEffect(() => {
+    if (calculation.shouldRedirect) {
+      router.push('/');
+    }
+  }, [calculation.shouldRedirect, router]);
+
+  useEffect(() => {
+    if (!calculation.result || calculation.calcError) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => setReady(true), 100);
+
+    return () => window.clearTimeout(timer);
+  }, [calculation.calcError, calculation.result]);
+
+  const { result, analysis, detailAnalysis, spots, avoidSpots, calcError } = calculation;
 
   if (calcError) {
     return (
@@ -87,7 +134,7 @@ export default function ResultPage() {
     );
   }
 
-  if (!result || !analysis) {
+  if (!result || !analysis || !detailAnalysis) {
     return (
       <main className="gradient-bg min-h-screen flex items-center justify-center">
         <div className="text-center space-y-4">
@@ -141,14 +188,8 @@ export default function ResultPage() {
             const ji = p.pillar?.[1] ?? '';
             const ganHanja = p.hanja?.[0] ?? '';
             const jiHanja = p.hanja?.[1] ?? '';
-            const ganOhangMap: Record<string, OhangType> = {
-              갑:'목',을:'목',병:'화',정:'화',무:'토',기:'토',경:'금',신:'금',임:'수',계:'수',
-            };
-            const jiOhangMap: Record<string, OhangType> = {
-              자:'수',축:'토',인:'목',묘:'목',진:'토',사:'화',오:'화',미:'토',신:'금',유:'금',술:'토',해:'수',
-            };
-            const ganOhang: OhangType = ganOhangMap[gan] ?? '토';
-            const jiOhang: OhangType = jiOhangMap[ji] ?? '토';
+            const ganOhang: OhangType = CHUNGGAN_OHANG[gan] ?? '토';
+            const jiOhang: OhangType = JIJI_OHANG[ji] ?? '토';
             const gc = OHANG_COLOR[ganOhang];
             const jc = OHANG_COLOR[jiOhang];
             return (
@@ -167,6 +208,30 @@ export default function ResultPage() {
               </div>
             );
           })}
+        </div>
+      </section>
+
+      <section className={`glass rounded-3xl p-6 mb-5 ${ready ? 'fade-in-up fade-in-up-delay-1' : 'opacity-0'}`}>
+        <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+          <div>
+            <h2 className="text-xs font-medium text-gray-500 uppercase tracking-widest mb-2">핵심 해석</h2>
+            <p className="text-lg font-semibold text-white">
+              일간 {detailAnalysis.dayMaster.stem}{detailAnalysis.dayMaster.hanja}
+              <span className={`ml-2 text-sm ${OHANG_COLOR[detailAnalysis.dayMaster.ohang].text}`}>
+                {detailAnalysis.dayMaster.ohang} 기운 중심
+              </span>
+            </p>
+          </div>
+          <span className={`text-xs px-3 py-1 rounded-full border ${OHANG_COLOR[detailAnalysis.dayMaster.ohang].border} ${OHANG_COLOR[detailAnalysis.dayMaster.ohang].bg} ${OHANG_COLOR[detailAnalysis.dayMaster.ohang].text}`}>
+            나를 대표하는 일간
+          </span>
+        </div>
+        <div className="space-y-3">
+          {detailAnalysis.highlights.map((highlight) => (
+            <div key={highlight} className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+              <p className="text-sm text-gray-200 leading-relaxed">{highlight}</p>
+            </div>
+          ))}
         </div>
       </section>
 
@@ -203,6 +268,84 @@ export default function ResultPage() {
           })}
         </div>
       </section>
+
+      <section className={`glass rounded-3xl p-6 mb-5 ${ready ? 'fade-in-up fade-in-up-delay-2' : 'opacity-0'}`}>
+        <h2 className="text-xs font-medium text-gray-500 uppercase tracking-widest mb-4">십신 · 지장간 · 12운성</h2>
+        <div className="grid gap-4 md:grid-cols-2">
+          {detailAnalysis.pillars.map((pillar) => {
+            const stemColor = OHANG_COLOR[pillar.stemOhang];
+            const branchColor = OHANG_COLOR[pillar.branchOhang];
+
+            return (
+              <article key={pillar.key} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">{pillar.label}</p>
+                    <p className="text-lg font-semibold text-white">
+                      {pillar.pillar}
+                      <span className="ml-2 text-sm text-gray-500">{pillar.pillarHanja}</span>
+                    </p>
+                  </div>
+                  <span className="text-xs px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/20">
+                    {pillar.twelveState}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                  <div className={`rounded-xl border px-3 py-3 ${stemColor.border} ${stemColor.bg}`}>
+                    <p className="text-[11px] uppercase tracking-wide text-gray-500 mb-1">천간 십신</p>
+                    <p className={`font-semibold ${stemColor.text}`}>{pillar.stemTenGod}</p>
+                    <p className="text-xs text-gray-400 mt-1">{pillar.stem}{pillar.stemHanja}</p>
+                  </div>
+                  <div className={`rounded-xl border px-3 py-3 ${branchColor.border} ${branchColor.bg}`}>
+                    <p className="text-[11px] uppercase tracking-wide text-gray-500 mb-1">지지 대표 십신</p>
+                    <p className={`font-semibold ${branchColor.text}`}>{pillar.branchTenGod}</p>
+                    <p className="text-xs text-gray-400 mt-1">{pillar.branch}{pillar.branchHanja}</p>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide text-gray-500 mb-2">지장간</p>
+                  <div className="flex flex-wrap gap-2">
+                    {pillar.hiddenStems.map((hiddenStem) => (
+                      <span
+                        key={`${pillar.key}-${hiddenStem.stem}-${hiddenStem.role}`}
+                        className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs ${OHANG_COLOR[hiddenStem.ohang].border} ${OHANG_COLOR[hiddenStem.ohang].bg} ${OHANG_COLOR[hiddenStem.ohang].text}`}
+                      >
+                        <span>{hiddenStem.role}</span>
+                        <span>{hiddenStem.stem}{hiddenStem.hanja}</span>
+                        <span className="text-gray-300">· {hiddenStem.tenGod}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </section>
+
+      {detailAnalysis.branchRelations.length > 0 && (
+        <section className={`glass rounded-3xl p-6 mb-5 ${ready ? 'fade-in-up fade-in-up-delay-2' : 'opacity-0'}`}>
+          <h2 className="text-xs font-medium text-gray-500 uppercase tracking-widest mb-4">지지 관계</h2>
+          <div className="space-y-3">
+            {detailAnalysis.branchRelations.map((relation) => (
+              <div key={`${relation.type}-${relation.name}-${relation.labels.join('-')}`} className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4">
+                <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${getRelationBadgeClass(relation.type)}`}>
+                    {relation.type}
+                  </span>
+                  <p className="font-semibold text-white">{relation.name}</p>
+                  <span className="text-xs text-gray-500">
+                    {relation.labels[0]} {relation.branches[0]} · {relation.labels[1]} {relation.branches[1]}
+                  </span>
+                </div>
+                <p className="text-sm text-gray-300 leading-relaxed">{relation.description}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* ── 부족한 기운 ── */}
       {analysis.lacking.length > 0 && (
@@ -310,6 +453,17 @@ export default function ResultPage() {
       </footer>
     </main>
   );
+}
+
+function getRelationBadgeClass(type: SajuDetailAnalysis['branchRelations'][number]['type']) {
+  const tone: Record<typeof type, string> = {
+    합: 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/20',
+    충: 'bg-red-500/15 text-red-300 border border-red-500/20',
+    형: 'bg-orange-500/15 text-orange-300 border border-orange-500/20',
+    해: 'bg-blue-500/15 text-blue-300 border border-blue-500/20',
+  };
+
+  return tone[type];
 }
 
 function SpotCard({ spot, ohang, index }: { spot: Spot; ohang: OhangType; index: number }) {
