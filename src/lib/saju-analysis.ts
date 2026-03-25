@@ -85,6 +85,28 @@ export interface SajuDetailAnalysis {
   highlights: string[];
 }
 
+export interface TenGodUiMeta {
+  label: string;
+  headline: string;
+  description: string;
+}
+
+export interface TwelveStateUiMeta {
+  label: TwelveStateType;
+  headline: string;
+  description: string;
+}
+
+export interface PillarConversationUi {
+  title: string;
+  summary: string;
+}
+
+export interface SimpleSajuSummary {
+  title: string;
+  lines: [string, string];
+}
+
 const ELEMENT_ORDER: OhangType[] = ['목', '화', '토', '금', '수'];
 
 const STEM_YINYANG: Record<Stem, 'yang' | 'yin'> = {
@@ -148,6 +170,74 @@ const BRANCH_RELATIONS: Array<{
   { type: '해', branches: ['유', '술'], name: '유술해', description: '결과를 챙기려는 마음과 현실 여건이 엇갈리는 흐름이에요.' },
 ];
 
+const TEN_GOD_UI: Record<TenGodType, TenGodUiMeta> = {
+  비견: {
+    label: '비견',
+    headline: '자기 색이 뚜렷한 성향',
+    description: '내 방식과 기준을 중요하게 여겨요. 독립적으로 밀고 가는 힘이 있는 편이에요.',
+  },
+  겁재: {
+    label: '겁재',
+    headline: '경쟁심과 추진력이 강한 성향',
+    description: '사람과 부딪히더라도 앞으로 나가려는 힘이 있어요. 속도감 있게 움직이는 편이에요.',
+  },
+  식신: {
+    label: '식신',
+    headline: '차분하게 표현하는 성향',
+    description: '내가 가진 것을 자연스럽게 풀어내요. 꾸준함과 생활 감각이 좋은 편이에요.',
+  },
+  상관: {
+    label: '상관',
+    headline: '표현력이 강하고 예민한 성향',
+    description: '생각과 감정을 밖으로 잘 드러내요. 틀에 맞지 않으면 답답함을 크게 느낄 수 있어요.',
+  },
+  편재: {
+    label: '편재',
+    headline: '기회를 빠르게 잡는 성향',
+    description: '현실 감각이 빠르고 상황 판단이 좋아요. 사람과 기회를 넓게 보는 편이에요.',
+  },
+  정재: {
+    label: '정재',
+    headline: '현실적이고 관리형인 성향',
+    description: '돈, 일정, 생활 운영을 안정적으로 챙기려는 편이에요. 실속과 책임을 중요하게 봐요.',
+  },
+  편관: {
+    label: '편관',
+    headline: '압박 속에서도 버티는 성향',
+    description: '긴장감이 있어도 책임을 지고 밀고 가는 힘이 있어요. 경쟁 상황에 민감할 수 있어요.',
+  },
+  정관: {
+    label: '정관',
+    headline: '책임감과 기준이 분명한 성향',
+    description: '원칙, 질서, 신뢰를 중요하게 여겨요. 맡은 역할을 안정적으로 해내려는 편이에요.',
+  },
+  편인: {
+    label: '편인',
+    headline: '직감과 해석력이 강한 성향',
+    description: '보이지 않는 흐름을 빨리 읽는 편이에요. 혼자 생각을 깊게 가져가는 시간이 중요해요.',
+  },
+  정인: {
+    label: '정인',
+    headline: '배우고 이해하려는 성향',
+    description: '정보를 받아들이고 정리하는 힘이 좋아요. 안정감 있는 도움과 보호를 중시해요.',
+  },
+};
+
+const TWELVE_STATE_UI: Record<TwelveStateType, TwelveStateUiMeta> = {
+  장생: { label: '장생', headline: '기운이 막 살아나는 상태', description: '새로 시작하는 힘이 있고, 성장 가능성이 크게 열려 있는 단계예요.' },
+  목욕: { label: '목욕', headline: '기운이 예민하게 움직이는 상태', description: '변화에 민감하고 주변 자극을 많이 받기 쉬운 단계예요.' },
+  관대: { label: '관대', headline: '기운이 점점 커지는 상태', description: '자신감이 붙고 바깥으로 나가려는 힘이 강해지는 단계예요.' },
+  건록: { label: '건록', headline: '자기 자리를 잡은 상태', description: '기운이 비교적 안정적으로 자리 잡아서 자기 페이스가 살아나는 단계예요.' },
+  제왕: { label: '제왕', headline: '기운이 가장 강한 상태', description: '에너지가 강하게 드러나고 존재감이 커지기 쉬운 단계예요.' },
+  쇠: { label: '쇠', headline: '기운이 조금씩 누그러지는 상태', description: '힘이 완전히 꺼진 건 아니지만, 한풀 꺾이며 조절이 필요한 단계예요.' },
+  병: { label: '병', headline: '기운이 흔들리는 상태', description: '에너지가 약해지고 컨디션 영향을 많이 받을 수 있는 단계예요.' },
+  사: { label: '사', headline: '기운이 거의 멈추는 상태', description: '활동성이 줄고 쉬어가야 할 필요가 커지는 단계예요.' },
+  묘: { label: '묘', headline: '기운이 깊이 잠든 상태', description: '겉으로는 조용하지만 안쪽에 쌓여 있는 성향으로 남기 쉬운 단계예요.' },
+  절: { label: '절', headline: '기운이 끊어지는 상태', description: '기존 흐름이 약해지고 다른 방식의 전환이 필요한 단계예요.' },
+  태: { label: '태', headline: '새 기운이 준비되는 상태', description: '밖으로 드러나진 않지만 다음 흐름을 준비하는 단계예요.' },
+  양: { label: '양', headline: '기운이 막 자라려는 상태', description: '아직 작지만 분명히 살아나고 있는 씨앗 같은 단계예요.' },
+};
+
 export function analyzeSajuDetails(saju: SajuResult): SajuDetailAnalysis {
   const dayStem = getStem(saju.dayPillar);
   const dayMaster = {
@@ -173,6 +263,102 @@ export function analyzeSajuDetails(saju: SajuResult): SajuDetailAnalysis {
     pillars,
     branchRelations,
     highlights,
+  };
+}
+
+export function getStemTenGodUi(tenGod: TenGodType | '일간') {
+  if (tenGod === '일간') {
+    return {
+      label: '일간',
+      headline: '나를 대표하는 중심 성향',
+      description: '이 칸은 다른 사람과의 관계가 아니라, 사주에서 나 자신을 기준으로 보는 자리예요.',
+    };
+  }
+
+  return TEN_GOD_UI[tenGod];
+}
+
+export function getBranchTenGodUi(tenGod: TenGodType) {
+  return TEN_GOD_UI[tenGod];
+}
+
+export function getTwelveStateUi(state: TwelveStateType) {
+  return TWELVE_STATE_UI[state];
+}
+
+export function getPillarConversationUi(pillar: SajuPillarDetail, dayMaster: SajuDetailAnalysis['dayMaster']): PillarConversationUi {
+  const stemTone = pillar.key === 'day'
+    ? '나를 대표하는 중심 성향'
+    : getStemTenGodUi(pillar.stemTenGod).headline;
+  const branchTone = getBranchTenGodUi(pillar.branchTenGod).headline;
+
+  if (pillar.key === 'year') {
+    return {
+      title: '처음 자란 분위기와 시작점',
+      summary: `연주는 내가 어떤 배경에서 출발했는지를 보여줘요. 겉으로는 ${stemTone} 쪽 분위기가 깔리고, 안쪽에는 ${branchTone} 같은 기본 반응이 자리 잡기 쉬워요.`,
+    };
+  }
+
+  if (pillar.key === 'month') {
+    return {
+      title: '사회에서 보이는 내 모습',
+      summary: `월주는 회사나 학교, 사람들 사이에서 보이는 나에 가까워요. 그래서 ${stemTone} 같은 인상이 잘 드러나고, 실제 생활 감각이나 일 처리 방식도 이쪽 색을 많이 타요.`,
+    };
+  }
+
+  if (pillar.key === 'day') {
+    return {
+      title: '진짜 내 성격 중심',
+      summary: `일주는 사주에서 가장 중요한 자리예요. ${dayMaster.stem}${dayMaster.hanja} 일간이 바로 나 자신을 뜻하고, 겉보다 깊은 기본 성격은 ${branchTone} 쪽으로 나타나기 쉬워요.`,
+    };
+  }
+
+  return {
+    title: '속마음과 나중의 방향',
+    summary: `시주는 겉으로 바로 티 나는 모습보다는 속마음이나 시간이 지나며 더 뚜렷해지는 방향을 보여줘요. 안으로는 ${branchTone} 같은 반응이 쌓이고, 나중에는 ${stemTone} 같은 방식으로 힘이 실리기 쉬워요.`,
+  };
+}
+
+export function getPillarSubtitle(pillar: SajuPillarDetail, dayMaster: SajuDetailAnalysis['dayMaster']): string {
+  if (pillar.key === 'year') {
+    return '내가 어떤 분위기에서 시작했는지 보여주는 자리';
+  }
+
+  if (pillar.key === 'month') {
+    const stemTone = getStemTenGodUi(pillar.stemTenGod).headline;
+    return `사회에서는 ${stemTone} 쪽으로 보이기 쉬워요.`;
+  }
+
+  if (pillar.key === 'day') {
+    return `${dayMaster.stem}${dayMaster.hanja} 일간이라, 여기서 진짜 내 성격 중심을 봐요.`;
+  }
+
+  return '속마음이나 시간이 갈수록 더 드러나는 면을 보여줘요.';
+}
+
+export function getSimpleSajuSummary(detail: SajuDetailAnalysis): SimpleSajuSummary {
+  const monthPillar = detail.pillars.find((pillar) => pillar.key === 'month');
+  const dayPillar = detail.pillars.find((pillar) => pillar.key === 'day');
+  const hourPillar = detail.pillars.find((pillar) => pillar.key === 'hour');
+
+  const socialTone = monthPillar
+    ? getStemTenGodUi(monthPillar.stemTenGod).headline
+    : '차분한 분위기';
+  const innerTone = dayPillar
+    ? getBranchTenGodUi(dayPillar.branchTenGod).headline
+    : '자기 색이 뚜렷한 성향';
+  const laterTone = hourPillar
+    ? getBranchTenGodUi(hourPillar.branchTenGod).headline
+    : null;
+
+  return {
+    title: `${detail.dayMaster.stem}${detail.dayMaster.hanja} 일간 · ${detail.dayMaster.ohang} 기운 중심`,
+    lines: [
+      `겉으로는 ${socialTone} 쪽으로 보이지만, 속으로는 ${innerTone} 같은 결이 중심에 깔려 있어요.`,
+      laterTone
+        ? `시간이 갈수록 ${laterTone} 같은 면이 더 또렷해질 가능성이 커요.`
+        : '전체적으로는 자기 리듬을 지키는 쪽이 편한 타입으로 읽혀요.',
+    ],
   };
 }
 
@@ -298,6 +484,8 @@ function buildHighlights(
   relations: BranchRelation[],
 ): string[] {
   const monthPillar = pillars.find((pillar) => pillar.key === 'month');
+  const dayPillar = pillars.find((pillar) => pillar.key === 'day');
+  const hourPillar = pillars.find((pillar) => pillar.key === 'hour');
   const supportCount = pillars.filter((pillar) => pillar.stemOhang === dayMaster.ohang).length;
   const resourceCount = pillars.filter((pillar) => getTenGod(dayMaster.stem, pillar.stem) === '정인' || getTenGod(dayMaster.stem, pillar.stem) === '편인').length;
 
@@ -306,19 +494,30 @@ function buildHighlights(
   ];
 
   if (monthPillar) {
-    highlights.push(`월주는 ${monthPillar.stemTenGod} 성향이 걸려 있어 사회생활과 현실 감각에서 ${monthPillar.stemTenGod}의 색이 강하게 드러나기 쉬워요.`);
+    const monthStemMeaning = getStemTenGodUi(monthPillar.stemTenGod);
+    highlights.push(`사람들이 보는 너의 첫인상이나 사회생활 쪽에서는 ${monthStemMeaning.headline} 같은 분위기가 잘 보여요. 일할 때나 현실 감각에서도 이쪽 결이 자주 드러나는 편이에요.`);
+  }
+
+  if (dayPillar) {
+    const dayBranchMeaning = getBranchTenGodUi(dayPillar.branchTenGod);
+    highlights.push(`진짜 성격 중심을 보면, 기본적으로는 ${dayMaster.ohang} 기운을 바탕으로 움직이면서 속에서는 ${dayBranchMeaning.headline} 같은 반응이 꽤 중요한 축으로 깔려 있어요.`);
+  }
+
+  if (hourPillar) {
+    const hourMeaning = getBranchTenGodUi(hourPillar.branchTenGod);
+    highlights.push(`겉으로는 안 보여도 속마음이나 시간이 지나며 더 뚜렷해지는 부분은 ${hourMeaning.headline} 쪽일 가능성이 커요. 혼자 있을 때 이 결이 더 잘 느껴질 수 있어요.`);
   }
 
   if (supportCount >= 2 || resourceCount >= 2) {
-    highlights.push(`사주 안에 일간을 돕는 기운이 비교적 반복돼서 자기 색을 밀고 가는 힘이 있는 편으로 보여요.`);
+    highlights.push('전체적으로는 내 색을 밀고 가는 힘이 꽤 있는 편이라, 한번 방향을 잡으면 생각보다 쉽게 흔들리지는 않는 타입에 가까워 보여요.');
   } else {
-    highlights.push(`일간을 직접 돕는 기운이 많지 않아 환경이나 타이밍의 도움을 받는지가 체감에 크게 작용할 수 있어요.`);
+    highlights.push('반대로 혼자만의 힘으로 밀어붙이기보다는, 환경이나 타이밍을 잘 만나야 훨씬 편하게 풀리는 타입으로 읽혀요.');
   }
 
   if (relations.length > 0) {
-    highlights.push(`지지에서는 ${relations.map((relation) => relation.name).join(', ')} 흐름이 보여 관계와 환경 변화가 한 번에 크게 들어오는 시점이 있을 수 있어요.`);
+    highlights.push('관계나 환경이 한 번 바뀔 때 생각보다 크게 체감하는 편이라, 흐름이 바뀌는 시기에는 컨디션 영향을 더 받을 수 있어 보여요.');
   } else {
-    highlights.push('지지 관계가 비교적 단순해서 큰 충돌보다는 기본 성향이 꾸준히 드러나는 편이에요.');
+    highlights.push('사주 구조가 아주 복잡하게 충돌하는 편은 아니라서, 큰 변수보다 기본 성향이 꾸준히 이어지는 쪽에 더 가까워 보여요.');
   }
 
   return highlights;

@@ -27,7 +27,12 @@ import {
   type Spot,
 } from '@/lib/spots';
 import type { OhangType } from '@/lib/ohang';
-import { analyzeSajuDetails, type SajuDetailAnalysis } from '@/lib/saju-analysis';
+import {
+  analyzeSajuDetails,
+  getPillarSubtitle,
+  getSimpleSajuSummary,
+  type SajuDetailAnalysis,
+} from '@/lib/saju-analysis';
 
 export default function ResultPage() {
   const params = useSearchParams();
@@ -146,6 +151,7 @@ export default function ResultPage() {
   }
 
   const { saju, solarYear, solarMonth, solarDay, lunarYear, lunarMonth, lunarDay, isLeapMonth, isTimeCorrected, correctedHour, correctedMinute } = result;
+  const simpleSummary = getSimpleSajuSummary(detailAnalysis);
 
   // 사주 4기둥 파싱
   const pillars = [
@@ -188,6 +194,7 @@ export default function ResultPage() {
             const ji = p.pillar?.[1] ?? '';
             const ganHanja = p.hanja?.[0] ?? '';
             const jiHanja = p.hanja?.[1] ?? '';
+            const detailPillar = detailAnalysis.pillars.find((detail) => detail.label === p.label);
             const ganOhang: OhangType = CHUNGGAN_OHANG[gan] ?? '토';
             const jiOhang: OhangType = JIJI_OHANG[ji] ?? '토';
             const gc = OHANG_COLOR[ganOhang];
@@ -195,6 +202,11 @@ export default function ResultPage() {
             return (
               <div key={p.label} className="text-center">
                 <p className="text-xs text-gray-600 mb-2">{p.label}</p>
+                {detailPillar && (
+                  <p className="block text-[11px] text-gray-500 leading-snug mb-2 truncate">
+                    {getPillarSubtitle(detailPillar, detailAnalysis.dayMaster)}
+                  </p>
+                )}
                 <div className="flex flex-col gap-1.5">
                   <div className={`rounded-xl py-3 ${gc.bg} ${gc.text} border ${gc.border}`}>
                     <div className="text-xl font-bold">{gan}</div>
@@ -211,27 +223,44 @@ export default function ResultPage() {
         </div>
       </section>
 
+      {analysis.lacking.length > 0 && (
+        <section className={`glass rounded-3xl p-5 mb-5 border border-white/10 ${ready ? 'fade-in-up fade-in-up-delay-1' : 'opacity-0'}`}>
+          <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
+            <div>
+              <h2 className="text-xs font-medium text-gray-500 uppercase tracking-widest mb-2">지금 먼저 채우면 좋은 기운</h2>
+              <p className="text-sm text-gray-300 leading-relaxed">부족한 기운을 먼저 보면 지금 어떤 환경이 더 잘 맞는지 바로 읽기 쉬워져요.</p>
+            </div>
+            <span className="text-xs px-3 py-1 rounded-full border border-amber-500/20 bg-amber-500/10 text-amber-300">
+              {analysis.lacking.length}개 부족
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {analysis.lacking.map((ohang) => {
+              const color = OHANG_COLOR[ohang];
+              return (
+                <div
+                  key={`lack-summary-${ohang}`}
+                  className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 ${color.border} ${color.bg}`}
+                >
+                  <span className="text-sm">{OHANG_EMOJI[ohang]}</span>
+                  <span className={`text-sm font-semibold ${color.text}`}>{ohang}</span>
+                  <span className="text-xs text-gray-300">{OHANG_KEYWORDS[ohang][0]}</span>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
       <section className={`glass rounded-3xl p-6 mb-5 ${ready ? 'fade-in-up fade-in-up-delay-1' : 'opacity-0'}`}>
         <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
           <div>
             <h2 className="text-xs font-medium text-gray-500 uppercase tracking-widest mb-2">핵심 해석</h2>
-            <p className="text-lg font-semibold text-white">
-              일간 {detailAnalysis.dayMaster.stem}{detailAnalysis.dayMaster.hanja}
-              <span className={`ml-2 text-sm ${OHANG_COLOR[detailAnalysis.dayMaster.ohang].text}`}>
-                {detailAnalysis.dayMaster.ohang} 기운 중심
-              </span>
-            </p>
+            <p className="text-base font-semibold text-white">{simpleSummary.title}</p>
           </div>
-          <span className={`text-xs px-3 py-1 rounded-full border ${OHANG_COLOR[detailAnalysis.dayMaster.ohang].border} ${OHANG_COLOR[detailAnalysis.dayMaster.ohang].bg} ${OHANG_COLOR[detailAnalysis.dayMaster.ohang].text}`}>
-            나를 대표하는 일간
-          </span>
         </div>
-        <div className="space-y-3">
-          {detailAnalysis.highlights.map((highlight) => (
-            <div key={highlight} className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-              <p className="text-sm text-gray-200 leading-relaxed">{highlight}</p>
-            </div>
-          ))}
+        <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+          <p className="text-sm text-gray-200 leading-relaxed">{simpleSummary.lines[0]}</p>
         </div>
       </section>
 
@@ -270,82 +299,12 @@ export default function ResultPage() {
       </section>
 
       <section className={`glass rounded-3xl p-6 mb-5 ${ready ? 'fade-in-up fade-in-up-delay-2' : 'opacity-0'}`}>
-        <h2 className="text-xs font-medium text-gray-500 uppercase tracking-widest mb-4">십신 · 지장간 · 12운성</h2>
-        <div className="grid gap-4 md:grid-cols-2">
-          {detailAnalysis.pillars.map((pillar) => {
-            const stemColor = OHANG_COLOR[pillar.stemOhang];
-            const branchColor = OHANG_COLOR[pillar.branchOhang];
-
-            return (
-              <article key={pillar.key} className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <div className="flex items-start justify-between gap-3 mb-3">
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">{pillar.label}</p>
-                    <p className="text-lg font-semibold text-white">
-                      {pillar.pillar}
-                      <span className="ml-2 text-sm text-gray-500">{pillar.pillarHanja}</span>
-                    </p>
-                  </div>
-                  <span className="text-xs px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/20">
-                    {pillar.twelveState}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 mb-3">
-                  <div className={`rounded-xl border px-3 py-3 ${stemColor.border} ${stemColor.bg}`}>
-                    <p className="text-[11px] uppercase tracking-wide text-gray-500 mb-1">천간 십신</p>
-                    <p className={`font-semibold ${stemColor.text}`}>{pillar.stemTenGod}</p>
-                    <p className="text-xs text-gray-400 mt-1">{pillar.stem}{pillar.stemHanja}</p>
-                  </div>
-                  <div className={`rounded-xl border px-3 py-3 ${branchColor.border} ${branchColor.bg}`}>
-                    <p className="text-[11px] uppercase tracking-wide text-gray-500 mb-1">지지 대표 십신</p>
-                    <p className={`font-semibold ${branchColor.text}`}>{pillar.branchTenGod}</p>
-                    <p className="text-xs text-gray-400 mt-1">{pillar.branch}{pillar.branchHanja}</p>
-                  </div>
-                </div>
-
-                <div>
-                  <p className="text-[11px] uppercase tracking-wide text-gray-500 mb-2">지장간</p>
-                  <div className="flex flex-wrap gap-2">
-                    {pillar.hiddenStems.map((hiddenStem) => (
-                      <span
-                        key={`${pillar.key}-${hiddenStem.stem}-${hiddenStem.role}`}
-                        className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs ${OHANG_COLOR[hiddenStem.ohang].border} ${OHANG_COLOR[hiddenStem.ohang].bg} ${OHANG_COLOR[hiddenStem.ohang].text}`}
-                      >
-                        <span>{hiddenStem.role}</span>
-                        <span>{hiddenStem.stem}{hiddenStem.hanja}</span>
-                        <span className="text-gray-300">· {hiddenStem.tenGod}</span>
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </article>
-            );
-          })}
+        <h2 className="text-xs font-medium text-gray-500 uppercase tracking-widest mb-4">성향 요약</h2>
+        <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4 space-y-2">
+          <p className="text-sm text-gray-200 leading-relaxed">{simpleSummary.lines[0]}</p>
+          <p className="text-sm text-gray-300 leading-relaxed">{simpleSummary.lines[1]}</p>
         </div>
       </section>
-
-      {detailAnalysis.branchRelations.length > 0 && (
-        <section className={`glass rounded-3xl p-6 mb-5 ${ready ? 'fade-in-up fade-in-up-delay-2' : 'opacity-0'}`}>
-          <h2 className="text-xs font-medium text-gray-500 uppercase tracking-widest mb-4">지지 관계</h2>
-          <div className="space-y-3">
-            {detailAnalysis.branchRelations.map((relation) => (
-              <div key={`${relation.type}-${relation.name}-${relation.labels.join('-')}`} className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4">
-                <div className="flex flex-wrap items-center gap-2 mb-1.5">
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${getRelationBadgeClass(relation.type)}`}>
-                    {relation.type}
-                  </span>
-                  <p className="font-semibold text-white">{relation.name}</p>
-                  <span className="text-xs text-gray-500">
-                    {relation.labels[0]} {relation.branches[0]} · {relation.labels[1]} {relation.branches[1]}
-                  </span>
-                </div>
-                <p className="text-sm text-gray-300 leading-relaxed">{relation.description}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
 
       {/* ── 부족한 기운 ── */}
       {analysis.lacking.length > 0 && (
@@ -453,17 +412,6 @@ export default function ResultPage() {
       </footer>
     </main>
   );
-}
-
-function getRelationBadgeClass(type: SajuDetailAnalysis['branchRelations'][number]['type']) {
-  const tone: Record<typeof type, string> = {
-    합: 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/20',
-    충: 'bg-red-500/15 text-red-300 border border-red-500/20',
-    형: 'bg-orange-500/15 text-orange-300 border border-orange-500/20',
-    해: 'bg-blue-500/15 text-blue-300 border border-blue-500/20',
-  };
-
-  return tone[type];
 }
 
 function SpotCard({ spot, ohang, index }: { spot: Spot; ohang: OhangType; index: number }) {
