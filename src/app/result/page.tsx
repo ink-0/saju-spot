@@ -1,8 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { calcSajuPalja, countOhangFromSaju, type SajuPaljaResult } from '@/lib/manseryeok';
+import {
+  calcSajuPalja,
+  countOhangFromSaju,
+  CHUNGGAN_OHANG,
+  JIJI_OHANG,
+  type SajuPaljaResult,
+} from '@/lib/manseryeok';
 import {
   analyzeOhang,
   type OhangAnalysis,
@@ -21,19 +27,27 @@ import {
   type Spot,
 } from '@/lib/spots';
 import type { OhangType } from '@/lib/ohang';
+import {
+  analyzeSajuDetails,
+  getPillarSubtitle,
+  getSimpleSajuSummary,
+  type SajuDetailAnalysis,
+} from '@/lib/saju-analysis';
 
 export default function ResultPage() {
   const params = useSearchParams();
   const router = useRouter();
 
-  const [result, setResult] = useState<SajuPaljaResult | null>(null);
-  const [analysis, setAnalysis] = useState<OhangAnalysis | null>(null);
-  const [spots, setSpots] = useState<OhangSpots[]>([]);
-  const [avoidSpots, setAvoidSpots] = useState<OhangSpots[]>([]);
   const [ready, setReady] = useState(false);
-  const [calcError, setCalcError] = useState('');
-
-  useEffect(() => {
+  const calculation = useMemo<{
+    result: SajuPaljaResult | null;
+    analysis: OhangAnalysis | null;
+    detailAnalysis: SajuDetailAnalysis | null;
+    spots: OhangSpots[];
+    avoidSpots: OhangSpots[];
+    calcError: string;
+    shouldRedirect: boolean;
+  }>(() => {
     try {
       const calendarType = (params.get('calendarType') || 'solar') as 'solar' | 'lunar';
       const year = parseInt(params.get('year') || '0');
@@ -45,8 +59,15 @@ export default function ResultPage() {
       const isLeapMonth = params.get('isLeapMonth') === 'true';
 
       if (!year || !month || !day) {
-        router.push('/');
-        return;
+        return {
+          result: null,
+          analysis: null,
+          detailAnalysis: null,
+          spots: [],
+          avoidSpots: [],
+          calcError: '',
+          shouldRedirect: true,
+        };
       }
 
       const paljaResult = calcSajuPalja({
@@ -62,16 +83,47 @@ export default function ResultPage() {
 
       const counts = countOhangFromSaju(paljaResult.saju);
       const analysisResult = analyzeOhang(counts);
+      const detailResult = analyzeSajuDetails(paljaResult.saju);
 
-      setResult(paljaResult);
-      setAnalysis(analysisResult);
-      setSpots(getRecommendedSpots(analysisResult.lacking));
-      setAvoidSpots(getAvoidanceSpots(analysisResult.excess));
-      setTimeout(() => setReady(true), 100);
+      return {
+        result: paljaResult,
+        analysis: analysisResult,
+        detailAnalysis: detailResult,
+        spots: getRecommendedSpots(analysisResult.lacking),
+        avoidSpots: getAvoidanceSpots(analysisResult.excess),
+        calcError: '',
+        shouldRedirect: false,
+      };
     } catch (err) {
-      setCalcError(`계산 오류: ${err instanceof Error ? err.message : '알 수 없는 오류'}`);
+      return {
+        result: null,
+        analysis: null,
+        detailAnalysis: null,
+        spots: [],
+        avoidSpots: [],
+        calcError: `계산 오류: ${err instanceof Error ? err.message : '알 수 없는 오류'}`,
+        shouldRedirect: false,
+      };
     }
-  }, [params, router]);
+  }, [params]);
+
+  useEffect(() => {
+    if (calculation.shouldRedirect) {
+      router.push('/');
+    }
+  }, [calculation.shouldRedirect, router]);
+
+  useEffect(() => {
+    if (!calculation.result || calculation.calcError) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => setReady(true), 100);
+
+    return () => window.clearTimeout(timer);
+  }, [calculation.calcError, calculation.result]);
+
+  const { result, analysis, detailAnalysis, spots, avoidSpots, calcError } = calculation;
 
   if (calcError) {
     return (
@@ -87,7 +139,7 @@ export default function ResultPage() {
     );
   }
 
-  if (!result || !analysis) {
+  if (!result || !analysis || !detailAnalysis) {
     return (
       <main className="gradient-bg min-h-screen flex items-center justify-center">
         <div className="text-center space-y-4">
@@ -99,6 +151,7 @@ export default function ResultPage() {
   }
 
   const { saju, solarYear, solarMonth, solarDay, lunarYear, lunarMonth, lunarDay, isLeapMonth, isTimeCorrected, correctedHour, correctedMinute } = result;
+  const simpleSummary = getSimpleSajuSummary(detailAnalysis);
 
   // 사주 4기둥 파싱
   const pillars = [
@@ -141,19 +194,19 @@ export default function ResultPage() {
             const ji = p.pillar?.[1] ?? '';
             const ganHanja = p.hanja?.[0] ?? '';
             const jiHanja = p.hanja?.[1] ?? '';
-            const ganOhangMap: Record<string, OhangType> = {
-              갑:'목',을:'목',병:'화',정:'화',무:'토',기:'토',경:'금',신:'금',임:'수',계:'수',
-            };
-            const jiOhangMap: Record<string, OhangType> = {
-              자:'수',축:'토',인:'목',묘:'목',진:'토',사:'화',오:'화',미:'토',신:'금',유:'금',술:'토',해:'수',
-            };
-            const ganOhang: OhangType = ganOhangMap[gan] ?? '토';
-            const jiOhang: OhangType = jiOhangMap[ji] ?? '토';
+            const detailPillar = detailAnalysis.pillars.find((detail) => detail.label === p.label);
+            const ganOhang: OhangType = CHUNGGAN_OHANG[gan] ?? '토';
+            const jiOhang: OhangType = JIJI_OHANG[ji] ?? '토';
             const gc = OHANG_COLOR[ganOhang];
             const jc = OHANG_COLOR[jiOhang];
             return (
               <div key={p.label} className="text-center">
                 <p className="text-xs text-gray-600 mb-2">{p.label}</p>
+                {detailPillar && (
+                  <p className="block text-[11px] text-gray-500 leading-snug mb-2 truncate">
+                    {getPillarSubtitle(detailPillar, detailAnalysis.dayMaster)}
+                  </p>
+                )}
                 <div className="flex flex-col gap-1.5">
                   <div className={`rounded-xl py-3 ${gc.bg} ${gc.text} border ${gc.border}`}>
                     <div className="text-xl font-bold">{gan}</div>
@@ -167,6 +220,47 @@ export default function ResultPage() {
               </div>
             );
           })}
+        </div>
+      </section>
+
+      {analysis.lacking.length > 0 && (
+        <section className={`glass rounded-3xl p-5 mb-5 border border-white/10 ${ready ? 'fade-in-up fade-in-up-delay-1' : 'opacity-0'}`}>
+          <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
+            <div>
+              <h2 className="text-xs font-medium text-gray-500 uppercase tracking-widest mb-2">지금 먼저 채우면 좋은 기운</h2>
+              <p className="text-sm text-gray-300 leading-relaxed">부족한 기운을 먼저 보면 지금 어떤 환경이 더 잘 맞는지 바로 읽기 쉬워져요.</p>
+            </div>
+            <span className="text-xs px-3 py-1 rounded-full border border-amber-500/20 bg-amber-500/10 text-amber-300">
+              {analysis.lacking.length}개 부족
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {analysis.lacking.map((ohang) => {
+              const color = OHANG_COLOR[ohang];
+              return (
+                <div
+                  key={`lack-summary-${ohang}`}
+                  className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 ${color.border} ${color.bg}`}
+                >
+                  <span className="text-sm">{OHANG_EMOJI[ohang]}</span>
+                  <span className={`text-sm font-semibold ${color.text}`}>{ohang}</span>
+                  <span className="text-xs text-gray-300">{OHANG_KEYWORDS[ohang][0]}</span>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      <section className={`glass rounded-3xl p-6 mb-5 ${ready ? 'fade-in-up fade-in-up-delay-1' : 'opacity-0'}`}>
+        <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+          <div>
+            <h2 className="text-xs font-medium text-gray-500 uppercase tracking-widest mb-2">핵심 해석</h2>
+            <p className="text-base font-semibold text-white">{simpleSummary.title}</p>
+          </div>
+        </div>
+        <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+          <p className="text-sm text-gray-200 leading-relaxed">{simpleSummary.lines[0]}</p>
         </div>
       </section>
 
@@ -201,6 +295,14 @@ export default function ResultPage() {
               </div>
             );
           })}
+        </div>
+      </section>
+
+      <section className={`glass rounded-3xl p-6 mb-5 ${ready ? 'fade-in-up fade-in-up-delay-2' : 'opacity-0'}`}>
+        <h2 className="text-xs font-medium text-gray-500 uppercase tracking-widest mb-4">성향 요약</h2>
+        <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4 space-y-2">
+          <p className="text-sm text-gray-200 leading-relaxed">{simpleSummary.lines[0]}</p>
+          <p className="text-sm text-gray-300 leading-relaxed">{simpleSummary.lines[1]}</p>
         </div>
       </section>
 
