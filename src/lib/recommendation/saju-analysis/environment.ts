@@ -7,7 +7,7 @@ import type {
   StructureTag,
   TemperatureFeel,
   TimePreferenceTag,
-} from './types';
+} from '../types';
 
 interface EnvironmentAccumulator {
   brightness: number;

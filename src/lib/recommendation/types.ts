@@ -10,6 +10,7 @@ export type ActivityTag = 'rest' | 'explore';
 export type TemperatureFeel = 'cool' | 'warm' | 'neutral';
 export type StructureTag = 'linear' | 'organic' | 'mixed';
 export type MaterialTag = 'metal' | 'wood' | 'stone' | 'water' | 'glass' | 'earth';
+export type PlaceAxisKey = 'thermal' | 'brightness' | 'stimulation' | 'sociability' | 'naturalness' | 'grounding';
 
 export interface SajuEngineInput {
   birth_date: string;
@@ -125,6 +126,30 @@ export interface PlaceRecord {
     temperature_feel: TemperatureFeel;
     structure: StructureTag;
   };
+}
+
+export interface PlaceInfluenceAxes {
+  thermal: number;
+  brightness: number;
+  stimulation: number;
+  sociability: number;
+  naturalness: number;
+  grounding: number;
+}
+
+export interface ElementTraitDefinition {
+  label: string;
+  core_keywords: string[];
+  direct_signals: string[];
+  environment_cues: string[];
+}
+
+export interface PlaceInfluenceProfile {
+  axes: PlaceInfluenceAxes;
+  element_scores: Record<ElementKey, number>;
+  dominant_elements: ElementKey[];
+  observable_traits: PlaceRecord['tags'];
+  explanation_factors: string[];
 }
 
 export interface RecommendationBreakdown {

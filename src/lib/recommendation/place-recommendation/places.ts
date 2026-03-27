@@ -1,4 +1,4 @@
-import type { PlaceRecord } from './types';
+import type { PlaceRecord } from '../types';
 
 export const PLACE_DATASET: PlaceRecord[] = [
   {

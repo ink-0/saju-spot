@@ -1,7 +1,8 @@
-import { runEnvironmentTranslationEngine } from './environment';
-import { runInterpretationEngine } from './interpretation';
-import { generateExplanation, runRecommendationEngine } from './recommendation';
-import { runSajuCoreEngine } from './saju-core';
+import { generateExplanation } from './saju-analysis/explanation';
+import { runEnvironmentTranslationEngine } from './saju-analysis/environment';
+import { runInterpretationEngine } from './saju-analysis/interpretation';
+import { runSajuCoreEngine } from './saju-analysis/saju-core';
+import { runRecommendationEngine } from './place-recommendation/recommendation';
 import type {
   RecommendationPipelineOutput,
   SajuEngineInput,

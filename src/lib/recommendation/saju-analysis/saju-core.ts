@@ -7,14 +7,14 @@ import {
 import {
   CHUNGGAN_OHANG,
   JIJI_OHANG,
-} from '../manseryeok';
+} from '../../manseryeok';
 import type {
   ElementKey,
   PillarValue,
   SajuCoreOutput,
   SajuEngineInput,
   SeasonKey,
-} from './types';
+} from '../types';
 
 const OHANG_TO_ELEMENT: Record<string, ElementKey> = {
   목: 'wood',

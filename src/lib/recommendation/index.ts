@@ -1,8 +1,18 @@
-export { runSajuCoreEngine } from './saju-core';
-export { runInterpretationEngine } from './interpretation';
-export { runEnvironmentTranslationEngine } from './environment';
-export { runRecommendationEngine, generateExplanation } from './recommendation';
-export { PLACE_DATASET } from './places';
+export { generateExplanation } from './saju-analysis/explanation';
+export { runSajuCoreEngine } from './saju-analysis/saju-core';
+export { runInterpretationEngine } from './saju-analysis/interpretation';
+export { runEnvironmentTranslationEngine } from './saju-analysis/environment';
+export {
+  ELEMENT_TRAITS,
+  calculatePlaceAxes,
+  calculatePlaceInfluence,
+} from './place-recommendation/place-influence';
+export {
+  mapExternalPoiToPlaceRecord,
+  mapExternalPoisToPlaceRecords,
+} from './place-recommendation/external-poi-mapper';
+export { runRecommendationEngine } from './place-recommendation/recommendation';
+export { PLACE_DATASET } from './place-recommendation/places';
 export {
   SAMPLE_PIPELINE_INPUT,
   SAMPLE_PIPELINE_OUTPUT,
@@ -12,12 +22,15 @@ export type {
   ActivityTag,
   ClimateCondition,
   ElementKey,
+  ElementTraitDefinition,
   EnvironmentProfile,
   EnvironmentTranslationOutput,
   ExplanationInput,
   Gender,
   InterpretationConclusion,
   InterpretationOutput,
+  PlaceInfluenceAxes,
+  PlaceInfluenceProfile,
   PlaceRecord,
   RecommendationOutput,
   RecommendationPipelineOutput,
