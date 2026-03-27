@@ -11,6 +11,20 @@ export {
   mapExternalPoiToPlaceRecord,
   mapExternalPoisToPlaceRecords,
 } from './place-recommendation/external-poi-mapper';
+export {
+  mapKakaoLocalDocumentToPlaceRecord,
+  mapKakaoLocalDocumentsToPlaceRecords,
+  mapTourApiItemToPlaceRecord,
+  mapTourApiItemsToPlaceRecords,
+  normalizeKakaoLocalDocument,
+  normalizeTourApiItem,
+  searchAndMapKakaoLocalDocuments,
+  searchAndMapTourApiItemsByKeyword,
+  searchAndMapTourApiItemsByLocation,
+  searchKakaoLocalByKeyword,
+  searchTourApiByKeyword,
+  searchTourApiByLocation,
+} from './place-recommendation/providers';
 export { runRecommendationEngine } from './place-recommendation/recommendation';
 export { PLACE_DATASET } from './place-recommendation/places';
 export {
