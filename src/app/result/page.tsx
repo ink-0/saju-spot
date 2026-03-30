@@ -159,7 +159,7 @@ export default function ResultPage() {
             birth_time: `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`,
             calendar_type: calendarType,
             leap_month: leapMonth,
-            location: 'Seoul',
+            location: '서울',
           }),
         });
 

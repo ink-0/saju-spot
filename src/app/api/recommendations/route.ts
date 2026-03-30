@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import {
+  calculatePlaceInfluence,
   PLACE_DATASET,
   runEnvironmentTranslationEngine,
   runInterpretationEngine,
@@ -66,20 +67,43 @@ async function fetchProviderPlaces(location: string, missingElements: ElementKey
   places: PlaceRecord[];
   status: 'success' | 'partial' | 'empty' | 'failed';
 }> {
-  const keyword = buildPrimaryKeyword(location, missingElements, yongshin);
+  const searchSpecs = buildSearchSpecs(location, missingElements, yongshin);
 
-  const [kakaoResult, tourResult] = await Promise.allSettled([
-    searchAndMapKakaoLocalDocuments({ query: keyword, size: 10 }),
-    searchAndMapTourApiItemsByKeyword({ keyword, numOfRows: 10, areaCode: '1' }),
+  const kakaoTasks = searchSpecs.map((spec) =>
+    searchAndMapKakaoLocalDocuments(
+      {
+        query: spec.query,
+        size: 8,
+        category_group_code: spec.kakaoCategoryGroupCode,
+      },
+    ),
+  );
+  const tourTasks = searchSpecs.map((spec) =>
+    searchAndMapTourApiItemsByKeyword(
+      {
+        keyword: spec.query,
+        numOfRows: 8,
+        areaCode: '1',
+        contentTypeId: spec.tourContentTypeId,
+      },
+    ),
+  );
+
+  const [kakaoResults, tourResults] = await Promise.all([
+    Promise.allSettled(kakaoTasks),
+    Promise.allSettled(tourTasks),
   ]);
 
   const merged = [
-    ...(kakaoResult.status === 'fulfilled' ? kakaoResult.value : []),
-    ...(tourResult.status === 'fulfilled' ? tourResult.value : []),
+    ...extractPlaces(kakaoResults),
+    ...extractPlaces(tourResults),
   ];
 
-  const deduped = dedupePlaces(merged);
-  const successCount = [kakaoResult, tourResult].filter((result) => result.status === 'fulfilled').length;
+  const targetElements = missingElements.length > 0 ? missingElements : [yongshin];
+  const filtered = filterPlacesByTargetElements(merged, targetElements);
+  const deduped = dedupePlaces(filtered.length > 0 ? filtered : merged);
+  const providerStatuses = [...kakaoResults, ...tourResults];
+  const successCount = providerStatuses.filter((result) => result.status === 'fulfilled').length;
 
   return {
     places: deduped,
@@ -95,16 +119,74 @@ async function fetchProviderPlaces(location: string, missingElements: ElementKey
 }
 
 function buildPrimaryKeyword(location: string, missingElements: ElementKey[], yongshin: ElementKey): string {
+  return buildSearchSpecs(location, missingElements, yongshin)[0]?.query ?? `${location} 명소`;
+}
+
+function buildSearchSpecs(location: string, missingElements: ElementKey[], yongshin: ElementKey) {
   const targetElement = missingElements[0] ?? yongshin;
-  const keywordByElement: Record<ElementKey, string> = {
-    wood: '공원',
-    fire: '광장',
-    earth: '박물관',
-    metal: '전시관',
-    water: '수변',
+  const baseLocation = normalizeSearchLocation(location);
+  const traitMap: Record<ElementKey, Array<{
+    keyword: string;
+    kakaoCategoryGroupCode?: string;
+    tourContentTypeId?: string;
+  }>> = {
+    wood: [
+      { keyword: '공원', kakaoCategoryGroupCode: 'AT4', tourContentTypeId: '12' },
+      { keyword: '숲길', kakaoCategoryGroupCode: 'AT4', tourContentTypeId: '12' },
+      { keyword: '수목원', kakaoCategoryGroupCode: 'AT4', tourContentTypeId: '12' },
+      { keyword: '생태공원', kakaoCategoryGroupCode: 'AT4', tourContentTypeId: '12' },
+    ],
+    fire: [
+      { keyword: '전망대', kakaoCategoryGroupCode: 'AT4', tourContentTypeId: '12' },
+      { keyword: '광장', kakaoCategoryGroupCode: 'AT4', tourContentTypeId: '12' },
+      { keyword: '야경 명소', kakaoCategoryGroupCode: 'AT4', tourContentTypeId: '12' },
+      { keyword: '루프탑', kakaoCategoryGroupCode: 'CE7', tourContentTypeId: '15' },
+    ],
+    earth: [
+      { keyword: '궁궐', kakaoCategoryGroupCode: 'CT1', tourContentTypeId: '14' },
+      { keyword: '박물관', kakaoCategoryGroupCode: 'CT1', tourContentTypeId: '14' },
+      { keyword: '고궁', kakaoCategoryGroupCode: 'AT4', tourContentTypeId: '12' },
+      { keyword: '정원', kakaoCategoryGroupCode: 'AT4', tourContentTypeId: '12' },
+    ],
+    metal: [
+      { keyword: '전시관', kakaoCategoryGroupCode: 'CT1', tourContentTypeId: '14' },
+      { keyword: '미술관', kakaoCategoryGroupCode: 'CT1', tourContentTypeId: '14' },
+      { keyword: '현대건축', kakaoCategoryGroupCode: 'AT4', tourContentTypeId: '12' },
+      { keyword: '도심 전망', kakaoCategoryGroupCode: 'AT4', tourContentTypeId: '12' },
+    ],
+    water: [
+      { keyword: '한강공원', kakaoCategoryGroupCode: 'AT4', tourContentTypeId: '12' },
+      { keyword: '수변', kakaoCategoryGroupCode: 'AT4', tourContentTypeId: '12' },
+      { keyword: '강변 산책로', kakaoCategoryGroupCode: 'AT4', tourContentTypeId: '12' },
+      { keyword: '천변', kakaoCategoryGroupCode: 'AT4', tourContentTypeId: '12' },
+    ],
   };
 
-  return `${location} ${keywordByElement[targetElement]}`;
+  return traitMap[targetElement].map((spec) => ({
+    ...spec,
+    query: `${baseLocation} ${spec.keyword}`,
+  }));
+}
+
+function extractPlaces(
+  results: PromiseSettledResult<PlaceRecord[]>[],
+): PlaceRecord[] {
+  return results.flatMap((result) => (result.status === 'fulfilled' ? result.value : []));
+}
+
+function filterPlacesByTargetElements(places: PlaceRecord[], targetElements: ElementKey[]): PlaceRecord[] {
+  return places.filter((place) => {
+    const influence = calculatePlaceInfluence(place);
+    return targetElements.some((element) => influence.element_scores[element] >= 2.5);
+  });
+}
+
+function normalizeSearchLocation(location: string): string {
+  if (/^seoul$/i.test(location)) {
+    return '서울';
+  }
+
+  return location;
 }
 
 function dedupePlaces(places: PlaceRecord[]): PlaceRecord[] {
