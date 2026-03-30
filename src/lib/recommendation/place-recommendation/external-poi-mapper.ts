@@ -34,7 +34,7 @@ const CATEGORY_DEFAULTS: Array<{
   override: PlaceRecordOverride;
 }> = [
   {
-    keywords: ['park', 'forest', 'trail', 'garden', 'arboretum'],
+    keywords: ['park', 'forest', 'trail', 'garden', 'arboretum', '공원', '수목원', '숲', '산책', '둘레길', '정원', '생태'],
     override: {
       element: ['wood'],
       nature_ratio: 5,
@@ -48,7 +48,7 @@ const CATEGORY_DEFAULTS: Array<{
     },
   },
   {
-    keywords: ['river', 'stream', 'waterfront', 'lake', 'beach'],
+    keywords: ['river', 'stream', 'waterfront', 'lake', 'beach', '한강', '강', '천', '수변', '호수', '바다', '해변', '폭포'],
     override: {
       element: ['water'],
       nature_ratio: 4,
@@ -62,7 +62,7 @@ const CATEGORY_DEFAULTS: Array<{
     },
   },
   {
-    keywords: ['museum', 'palace', 'hotel', 'gallery', 'cultural'],
+    keywords: ['museum', 'palace', 'hotel', 'gallery', 'cultural', '박물관', '미술관', '궁', '문화', '도서관', '호텔', '사찰', '전통'],
     override: {
       element: ['earth'],
       nature_ratio: 2,
@@ -76,7 +76,7 @@ const CATEGORY_DEFAULTS: Array<{
     },
   },
   {
-    keywords: ['tower', 'plaza', 'restaurant', 'cafe', 'festival'],
+    keywords: ['tower', 'plaza', 'restaurant', 'cafe', 'festival', '광장', '전망대', '타워', '축제', '거리', '시장', '야경', '카페', '음식점'],
     override: {
       element: ['fire'],
       nature_ratio: 1,
@@ -90,7 +90,7 @@ const CATEGORY_DEFAULTS: Array<{
     },
   },
   {
-    keywords: ['finance', 'bank', 'business', 'hospital', 'station'],
+    keywords: ['finance', 'bank', 'business', 'hospital', 'station', '금융', '은행', '업무', '병원', '역', '센터', '오피스', '전시관', '컨벤션'],
     override: {
       element: ['metal'],
       nature_ratio: 0,
@@ -106,13 +106,13 @@ const CATEGORY_DEFAULTS: Array<{
 ];
 
 const FALLBACK_TAGS: PlaceRecord['tags'] = {
-  element: ['earth'],
+  element: [],
   nature_ratio: 2,
   brightness: 3,
   crowd: 2,
-  material: ['stone'],
-  activity: ['rest'],
-  time_preference: ['day'],
+  material: [],
+  activity: ['rest', 'explore'],
+  time_preference: ['day', 'night'],
   temperature_feel: 'neutral',
   structure: 'mixed',
 };
@@ -147,8 +147,8 @@ export function mapExternalPoisToPlaceRecords(
 
 function inferOverrideFromRaw(raw: RawExternalPoi): PlaceRecordOverride {
   const haystack = `${raw.name} ${raw.category ?? ''} ${raw.description ?? ''}`.toLowerCase();
-  const matched = CATEGORY_DEFAULTS.find((entry) => entry.keywords.some((keyword) => haystack.includes(keyword)));
-  const override = matched?.override ?? {};
+  const matches = CATEGORY_DEFAULTS.filter((entry) => entry.keywords.some((keyword) => haystack.includes(keyword)));
+  const override = mergeOverrides(matches.map((match) => match.override));
 
   if (raw.hours?.toLowerCase().includes('night') && !override.time_preference) {
     return {
@@ -158,6 +158,29 @@ function inferOverrideFromRaw(raw: RawExternalPoi): PlaceRecordOverride {
   }
 
   return override;
+}
+
+function mergeOverrides(overrides: PlaceRecordOverride[]): PlaceRecordOverride {
+  if (overrides.length === 0) {
+    return {};
+  }
+
+  return overrides.reduce<PlaceRecordOverride>((merged, current) => ({
+    ...merged,
+    ...current,
+    element: uniqueElements([...(merged.element ?? []), ...(current.element ?? [])]),
+    material: uniqueArray([...(merged.material ?? []), ...(current.material ?? [])]),
+    activity: uniqueArray([...(merged.activity ?? []), ...(current.activity ?? [])]),
+    time_preference: uniqueArray([...(merged.time_preference ?? []), ...(current.time_preference ?? [])]),
+  }), {});
+}
+
+function uniqueElements(items: PlaceRecord['tags']['element']): PlaceRecord['tags']['element'] {
+  return [...new Set(items)];
+}
+
+function uniqueArray<T>(items: T[]): T[] {
+  return [...new Set(items)];
 }
 
 function slugify(value: string): string {

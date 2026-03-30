@@ -1,9 +1,10 @@
 import { PLACE_DATASET } from './places';
 import { calculatePlaceInfluence } from './place-influence';
 import type {
+  ElementKey,
   EnvironmentTranslationOutput,
-  PlaceRecord,
   PlaceInfluenceProfile,
+  PlaceRecord,
   RecommendationBreakdown,
   RecommendationOutput,
   RecommendationResult,
@@ -19,7 +20,24 @@ export function runRecommendationEngine(
 ): RecommendationOutput {
   const recommendations = places
     .map((place) => scorePlace(place, interpretation, environment, userPreference))
-    .sort((left, right) => right.score - left.score)
+    .sort((left, right) => {
+      if (right.breakdown.replenishment_score !== left.breakdown.replenishment_score) {
+        return right.breakdown.replenishment_score - left.breakdown.replenishment_score;
+      }
+      if (right.breakdown.excess_element_control !== left.breakdown.excess_element_control) {
+        return right.breakdown.excess_element_control - left.breakdown.excess_element_control;
+      }
+      if (right.breakdown.environment_fit !== left.breakdown.environment_fit) {
+        return right.breakdown.environment_fit - left.breakdown.environment_fit;
+      }
+      if (right.breakdown.supportive_element_match !== left.breakdown.supportive_element_match) {
+        return right.breakdown.supportive_element_match - left.breakdown.supportive_element_match;
+      }
+      if (right.breakdown.user_preference !== left.breakdown.user_preference) {
+        return right.breakdown.user_preference - left.breakdown.user_preference;
+      }
+      return right.score - left.score;
+    })
     .slice(0, 8);
 
   return { recommendations };
@@ -32,18 +50,21 @@ function scorePlace(
   userPreference: UserPreferenceInput,
 ): RecommendationResult {
   const placeInfluence = calculatePlaceInfluence(place);
+  const supportedMissingElements = getSupportedMissingElements(placeInfluence, interpretation);
   const breakdown: RecommendationBreakdown = {
+    replenishment_score: computeReplenishmentScore(placeInfluence, interpretation),
     missing_element_match: computeMissingElementMatch(placeInfluence, interpretation),
-    favorable_element_match: computeFavorableElementMatch(placeInfluence, interpretation, environment),
+    supportive_element_match: computeSupportiveElementMatch(placeInfluence, interpretation),
+    environment_fit: computeEnvironmentFit(placeInfluence, environment),
     excess_element_control: computeExcessControl(placeInfluence, interpretation),
     user_preference: computeUserPreference(placeInfluence, userPreference),
   };
 
   const score = roundScore(
-    breakdown.missing_element_match * 0.5
-      + breakdown.favorable_element_match * 0.3
-      + breakdown.excess_element_control * 0.1
-      + breakdown.user_preference * 0.1,
+    breakdown.replenishment_score * 0.65
+      + breakdown.excess_element_control * 0.15
+      + breakdown.environment_fit * 0.15
+      + breakdown.user_preference * 0.05,
   );
 
   return {
@@ -51,10 +72,28 @@ function scorePlace(
     name: place.name,
     location: place.location,
     score,
-    reason: buildReasons(place, placeInfluence, interpretation, environment, breakdown),
+    reason: buildReasons(placeInfluence, breakdown, supportedMissingElements),
     breakdown,
+    dominant_elements: placeInfluence.dominant_elements,
+    supported_missing_elements: supportedMissingElements,
     tags: place.tags,
   };
+}
+
+function computeReplenishmentScore(placeInfluence: PlaceInfluenceProfile, interpretation: InterpretationOutput): number {
+  const missing = interpretation.layer_a.missing_elements;
+  if (missing.length === 0) {
+    return 3;
+  }
+
+  const scores = missing.map((element) => placeInfluence.element_scores[element]);
+  if (scores.length === 1) {
+    return scores[0];
+  }
+
+  const maxMissing = Math.max(...scores);
+  const avgMissing = scores.reduce((sum, score) => sum + score, 0) / scores.length;
+  return roundScore(maxMissing * 0.7 + avgMissing * 0.3);
 }
 
 function computeMissingElementMatch(placeInfluence: PlaceInfluenceProfile, interpretation: InterpretationOutput): number {
@@ -67,19 +106,23 @@ function computeMissingElementMatch(placeInfluence: PlaceInfluenceProfile, inter
   return roundScore(total / missing.length);
 }
 
-function computeFavorableElementMatch(
+function computeSupportiveElementMatch(
   placeInfluence: PlaceInfluenceProfile,
   interpretation: InterpretationOutput,
+): number {
+  const favorable = [interpretation.conclusion.yongshin, ...interpretation.conclusion.heeshin];
+  const totalElementScore = favorable.reduce((sum, element) => sum + placeInfluence.element_scores[element], 0);
+  return roundScore(totalElementScore / favorable.length);
+}
+
+function computeEnvironmentFit(
+  placeInfluence: PlaceInfluenceProfile,
   environment: EnvironmentTranslationOutput,
 ): number {
   let score = 0;
-  const favorable = [interpretation.conclusion.yongshin, ...interpretation.conclusion.heeshin];
-  const totalElementScore = favorable.reduce((sum, element) => sum + placeInfluence.element_scores[element], 0);
-  score += (totalElementScore / favorable.length) * 0.5;
-  score += proximityScore(placeInfluence.observable_traits.nature_ratio, environment.environment_profile.nature_ratio) * 0.2;
-  score += proximityScore(placeInfluence.observable_traits.brightness, environment.environment_profile.brightness) * 0.15;
-  score += proximityScore(placeInfluence.observable_traits.crowd, environment.environment_profile.crowd) * 0.15;
-
+  score += proximityScore(placeInfluence.observable_traits.nature_ratio, environment.environment_profile.nature_ratio) * 0.4;
+  score += proximityScore(placeInfluence.observable_traits.brightness, environment.environment_profile.brightness) * 0.3;
+  score += proximityScore(placeInfluence.observable_traits.crowd, environment.environment_profile.crowd) * 0.3;
   return roundScore(score);
 }
 
@@ -125,38 +168,69 @@ function computeUserPreference(placeInfluence: PlaceInfluenceProfile, userPrefer
 }
 
 function buildReasons(
-  place: PlaceRecord,
   placeInfluence: PlaceInfluenceProfile,
-  interpretation: InterpretationOutput,
-  environment: EnvironmentTranslationOutput,
   breakdown: RecommendationBreakdown,
+  supportedMissingElements: ElementKey[],
 ): string[] {
   const reasons: string[] = [];
 
-  const matchedMissing = interpretation.layer_a.missing_elements.filter((element) => placeInfluence.element_scores[element] >= 3);
-  if (matchedMissing.length > 0) {
-    reasons.push(`Supports missing chart elements: ${matchedMissing.join(', ')}.`);
-  }
-
-  if (placeInfluence.observable_traits.material.some((material) => environment.environment_profile.material.includes(material))) {
-    reasons.push(`Material profile matches the recommended environment: ${placeInfluence.observable_traits.material.join(', ')}.`);
-  }
-
-  if (proximityScore(placeInfluence.observable_traits.crowd, environment.environment_profile.crowd) >= 4) {
-    reasons.push(`Crowd intensity is close to the target level (${environment.environment_profile.crowd}/5).`);
-  }
-
-  if (!interpretation.conclusion.avoid.some((element) => placeInfluence.element_scores[element] >= 3)) {
-    reasons.push('Does not over-amplify the elements that are already excessive.');
+  if (supportedMissingElements.length > 0) {
+    const primaryElement = supportedMissingElements[0];
+    const primaryScore = placeInfluence.element_scores[primaryElement];
+    const tone = primaryScore >= 4 ? '강하게' : '어느 정도';
+    reasons.push(`부족한 ${toKoreanElement(primaryElement)} 기운을 ${tone} 채워주는 장소예요.`);
   }
 
   if (placeInfluence.explanation_factors.length > 0) {
-    reasons.push(`Observed place traits: ${placeInfluence.explanation_factors.slice(0, 3).join(', ')}.`);
+    reasons.push(`근거는 ${translateFactors(placeInfluence.explanation_factors.slice(0, 3)).join(', ')} 쪽 특징이 뚜렷하기 때문이에요.`);
   }
 
-  reasons.push(`Scoring breakdown — missing:${breakdown.missing_element_match}, favorable:${breakdown.favorable_element_match}, control:${breakdown.excess_element_control}, preference:${breakdown.user_preference}.`);
+  if (breakdown.excess_element_control >= 3.5) {
+    reasons.push('과한 기운을 더 자극하지 않아 상대적으로 편하게 머물기 좋아요.');
+  }
+
+  if (breakdown.environment_fit >= 3.5) {
+    reasons.push('현재 필요한 환경 분위기와도 비교적 잘 맞는 편이에요.');
+  }
+
+  reasons.push(`부족한 기운 보강 ${breakdown.replenishment_score.toFixed(1)}/5 · 환경 적합 ${breakdown.environment_fit.toFixed(1)}/5`);
 
   return reasons;
+}
+
+function getSupportedMissingElements(placeInfluence: PlaceInfluenceProfile, interpretation: InterpretationOutput): ElementKey[] {
+  return interpretation.layer_a.missing_elements
+    .filter((element) => placeInfluence.element_scores[element] >= 2.5)
+    .sort((left, right) => placeInfluence.element_scores[right] - placeInfluence.element_scores[left]);
+}
+
+function translateFactors(factors: string[]): string[] {
+  const translations: Record<string, string> = {
+    'high vegetation': '녹지와 식생이 많고',
+    'bright visibility': '밝고 시야가 트여 있고',
+    'high crowd energy': '사람과 활기가 모이고',
+    'low stimulation': '자극이 과하지 않고',
+    'linear structure': '직선적이고 정돈된 구조가 있고',
+    'organic structure': '유기적이고 자연스러운 동선이 있고',
+    'mixed structure': '안정적으로 머물기 쉬운 구조가 있고',
+    'warm thermal feel': '따뜻한 느낌이 있고',
+    'cool thermal feel': '서늘한 느낌이 있고',
+    'neutral thermal feel': '온도감이 무난하고',
+  };
+
+  return factors.map((factor) => translations[factor] ?? factor.replace(' materials', ' 재질이 느껴지고'));
+}
+
+function toKoreanElement(element: ElementKey): string {
+  const mapping: Record<ElementKey, string> = {
+    wood: '목',
+    fire: '화',
+    earth: '토',
+    metal: '금',
+    water: '수',
+  };
+
+  return mapping[element];
 }
 
 function proximityScore(actual: number, desired: number): number {

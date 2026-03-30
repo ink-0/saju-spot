@@ -26,6 +26,7 @@ import {
   type OhangSpots,
   type Spot,
 } from '@/lib/spots';
+import type { RecommendationResult } from '@/lib/recommendation';
 import type { OhangType } from '@/lib/ohang';
 import {
   analyzeSajuDetails,
@@ -39,6 +40,11 @@ export default function ResultPage() {
   const router = useRouter();
 
   const [ready, setReady] = useState(false);
+  const [apiRecommendations, setApiRecommendations] = useState<RecommendationResult[]>([]);
+  const [apiRecommendationSource, setApiRecommendationSource] = useState<'external' | 'fallback' | null>(null);
+  const [apiRecommendationQuery, setApiRecommendationQuery] = useState('');
+  const [apiRecommendationLoading, setApiRecommendationLoading] = useState(false);
+  const [apiRecommendationError, setApiRecommendationError] = useState('');
   const calculation = useMemo<{
     result: SajuPaljaResult | null;
     analysis: OhangAnalysis | null;
@@ -124,6 +130,75 @@ export default function ResultPage() {
   }, [calculation.calcError, calculation.result]);
 
   const { result, analysis, detailAnalysis, spots, avoidSpots, calcError } = calculation;
+
+  useEffect(() => {
+    if (!result || !analysis) {
+      return;
+    }
+
+    const fetchRecommendations = async () => {
+      try {
+        setApiRecommendationLoading(true);
+        setApiRecommendationError('');
+
+        const calendarType = (params.get('calendarType') || 'solar') as 'solar' | 'lunar';
+        const year = parseInt(params.get('year') || '0');
+        const month = parseInt(params.get('month') || '0');
+        const day = parseInt(params.get('day') || '0');
+        const hour = parseInt(params.get('hour') || '12');
+        const minute = parseInt(params.get('minute') || '0');
+        const leapMonth = params.get('isLeapMonth') === 'true';
+
+        const response = await fetch('/api/recommendations', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            birth_date: `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
+            birth_time: `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`,
+            calendar_type: calendarType,
+            leap_month: leapMonth,
+            location: 'Seoul',
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('추천 데이터를 불러오지 못했어요.');
+        }
+
+        const data = await response.json() as {
+          source: 'external' | 'fallback';
+          provider_status: 'success' | 'partial' | 'empty' | 'failed';
+          query_keyword: string;
+          recommendation: {
+            recommendations: RecommendationResult[];
+          };
+        };
+
+        setApiRecommendationSource(data.source);
+        setApiRecommendationQuery(data.query_keyword);
+        setApiRecommendations(data.recommendation.recommendations);
+        setApiRecommendationError(
+          data.source === 'fallback'
+            ? data.provider_status === 'empty'
+              ? '실시간으로 찾은 명소가 지금 조건과 딱 맞지 않아 기본 추천을 함께 보여드려요.'
+              : data.provider_status === 'failed'
+                ? '외부 명소 데이터를 잠시 불러오지 못해 기본 추천을 먼저 보여드려요.'
+                : ''
+            : '',
+        );
+      } catch (error) {
+        setApiRecommendationError(error instanceof Error ? error.message : '추천 데이터를 불러오지 못했어요.');
+        setApiRecommendationSource(null);
+        setApiRecommendations([]);
+      } finally {
+        setApiRecommendationLoading(false);
+      }
+    };
+
+    void fetchRecommendations();
+  }, [analysis, params, result]);
 
   if (calcError) {
     return (
@@ -365,7 +440,42 @@ export default function ResultPage() {
       )}
 
       {/* ── 추천 명소 ── */}
-      {spots.map((ohangSpots, si) => (
+      {(apiRecommendations.length > 0 || apiRecommendationLoading || apiRecommendationError) && (
+        <section className={`mb-8 ${ready ? 'fade-in-up fade-in-up-delay-3' : 'opacity-0'}`}>
+          <div className="mb-4">
+            <h2 className="text-xl font-bold text-white">실제 명소 추천</h2>
+            <p className="text-gray-400 text-sm mt-1">
+              {apiRecommendationLoading
+                ? '외부 명소 데이터를 바탕으로 추천을 정리하고 있어요.'
+                : apiRecommendationSource === 'external'
+                  ? `외부 장소 데이터를 바탕으로 추천했어요 · 검색어: ${apiRecommendationQuery}`
+                  : '실시간 명소 결과가 충분하지 않아 기본 추천을 함께 보여드려요.'}
+            </p>
+          </div>
+
+          {apiRecommendationLoading && (
+            <div className="glass rounded-2xl p-5 border border-white/10 text-sm text-gray-300">
+              실시간 명소를 불러오는 중이에요...
+            </div>
+          )}
+
+          {apiRecommendationError && (
+            <div className="glass rounded-2xl p-5 border border-red-500/20 text-sm text-red-300">
+              {apiRecommendationError}
+            </div>
+          )}
+
+          {apiRecommendations.length > 0 && (
+            <div className="space-y-3">
+              {apiRecommendations.map((recommendation, index) => (
+                <ApiRecommendationCard key={`${recommendation.id}-${recommendation.name}`} recommendation={recommendation} index={index} />
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {apiRecommendations.length === 0 && spots.map((ohangSpots, si) => (
         <section key={ohangSpots.ohang} className={`mb-8 ${ready ? `fade-in-up fade-in-up-delay-${Math.min(si + 3, 5)}` : 'opacity-0'}`}>
           <div className="mb-4">
             <h2 className={`text-xl font-bold ${OHANG_COLOR[ohangSpots.ohang].text}`}>
@@ -412,6 +522,69 @@ export default function ResultPage() {
       </footer>
     </main>
   );
+}
+
+function ApiRecommendationCard({ recommendation, index }: { recommendation: RecommendationResult; index: number }) {
+  const dominantElement = recommendation.supported_missing_elements[0] ?? recommendation.dominant_elements[0] ?? recommendation.tags.element[0] ?? 'earth';
+  const dominantColor = OHANG_COLOR[toOhangType(dominantElement)];
+  const shownElements = recommendation.supported_missing_elements.length > 0
+    ? recommendation.supported_missing_elements
+    : recommendation.dominant_elements.length > 0
+      ? recommendation.dominant_elements
+      : recommendation.tags.element;
+
+  return (
+    <div className={`glass rounded-2xl overflow-hidden border ${dominantColor.border}`}>
+      <div className="px-5 py-4 border-b border-white/5 flex items-start justify-between gap-4">
+        <div>
+          <p className="text-xs text-gray-500 mb-1">추천 {index + 1}</p>
+          <p className="font-semibold text-white">{recommendation.name}</p>
+          <p className="text-xs text-gray-500 mt-1">{recommendation.location}</p>
+          {recommendation.supported_missing_elements.length > 0 && (
+            <p className={`text-xs mt-2 ${dominantColor.text}`}>
+              부족한 {recommendation.supported_missing_elements.map((element) => toOhangType(element)).join(', ')} 기운 보강
+            </p>
+          )}
+        </div>
+        <span className={`text-xs px-2.5 py-1 rounded-full ${dominantColor.bg} ${dominantColor.text}`}>
+          {recommendation.score.toFixed(2)}점
+        </span>
+      </div>
+      <div className="px-5 py-4 space-y-3">
+        <div className="flex flex-wrap gap-2">
+          {shownElements.map((element) => {
+            const ohang = toOhangType(element);
+            return (
+              <span key={`${recommendation.id}-${element}`} className={`text-xs px-2 py-0.5 rounded-full ${OHANG_COLOR[ohang].bg} ${OHANG_COLOR[ohang].text}`}>
+                {OHANG_EMOJI[ohang]} {ohang}
+              </span>
+            );
+          })}
+        </div>
+        <div className="grid grid-cols-2 gap-2 text-xs text-gray-400">
+          <div className="rounded-xl bg-white/5 px-3 py-2">부족 기운 보강 {recommendation.breakdown.replenishment_score.toFixed(1)}/5</div>
+          <div className="rounded-xl bg-white/5 px-3 py-2">환경 적합 {recommendation.breakdown.environment_fit.toFixed(1)}/5</div>
+        </div>
+        <div className="space-y-2">
+          {recommendation.reason.slice(0, 3).map((reason) => (
+            <p key={reason} className="text-sm text-gray-300 leading-relaxed">- {reason}</p>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function toOhangType(element: string): OhangType {
+  const mapping: Record<string, OhangType> = {
+    wood: '목',
+    fire: '화',
+    earth: '토',
+    metal: '금',
+    water: '수',
+  };
+
+  return mapping[element] ?? '토';
 }
 
 function SpotCard({ spot, ohang, index }: { spot: Spot; ohang: OhangType; index: number }) {

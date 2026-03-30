@@ -153,8 +153,10 @@ export interface PlaceInfluenceProfile {
 }
 
 export interface RecommendationBreakdown {
+  replenishment_score: number;
   missing_element_match: number;
-  favorable_element_match: number;
+  supportive_element_match: number;
+  environment_fit: number;
   excess_element_control: number;
   user_preference: number;
 }
@@ -166,6 +168,8 @@ export interface RecommendationResult {
   score: number;
   reason: string[];
   breakdown: RecommendationBreakdown;
+  dominant_elements: ElementKey[];
+  supported_missing_elements: ElementKey[];
   tags: PlaceRecord['tags'];
 }
 

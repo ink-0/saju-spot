@@ -104,11 +104,13 @@ export async function searchAndMapTourApiItemsByLocation(
 }
 
 export function normalizeKakaoLocalDocument(raw: KakaoLocalDocument): RawExternalPoi {
+  const koreanCategoryLabel = getKakaoCategoryLabel(raw);
+  const normalizedName = normalizePlaceName(raw.place_name, koreanCategoryLabel, raw.address_name || raw.road_address_name);
   return {
-    id: raw.id ?? buildCoordinateId(raw.x, raw.y, raw.place_name),
-    name: raw.place_name,
+    id: raw.id ?? buildCoordinateId(raw.x, raw.y, normalizedName),
+    name: normalizedName,
     location: raw.road_address_name || raw.address_name || 'Unknown location',
-    summary: raw.category_name || raw.category_group_name || raw.place_name,
+    summary: normalizeSummary(raw.category_name || raw.category_group_name || raw.place_name, koreanCategoryLabel),
     category: [raw.category_group_name, raw.category_name].filter(Boolean).join(' / '),
     description: buildKakaoDescription(raw),
     hours: inferKakaoHours(raw),
@@ -116,11 +118,13 @@ export function normalizeKakaoLocalDocument(raw: KakaoLocalDocument): RawExterna
 }
 
 export function normalizeTourApiItem(raw: TourApiItem): RawExternalPoi {
+  const koreanCategoryLabel = getTourApiCategoryLabel(raw);
+  const normalizedName = normalizePlaceName(raw.title, koreanCategoryLabel, raw.addr1);
   return {
-    id: raw.contentid ?? buildCoordinateId(raw.mapx, raw.mapy, raw.title),
-    name: raw.title,
+    id: raw.contentid ?? buildCoordinateId(raw.mapx, raw.mapy, normalizedName),
+    name: normalizedName,
     location: [raw.addr1, raw.addr2].filter(Boolean).join(' ') || 'Unknown location',
-    summary: raw.overview || raw.title,
+    summary: normalizeSummary(raw.overview || raw.title, koreanCategoryLabel),
     category: [raw.contenttypeid, raw.cat1, raw.cat2, raw.cat3].filter(Boolean).join(' / '),
     description: raw.overview,
     hours: raw.usetime || inferTourApiHours(raw),
@@ -190,6 +194,78 @@ function buildCoordinateId(x: string | number | undefined, y: string | number | 
   }
 
   return fallbackName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
+function normalizePlaceName(name: string, fallbackCategory?: string, location?: string): string {
+  if (containsHangul(name)) {
+    return name;
+  }
+
+  const cityLabel = getLocationLabel(location);
+  const categoryLabel = fallbackCategory ?? '추천 명소';
+  return cityLabel ? `${cityLabel} ${categoryLabel}` : `${categoryLabel}`;
+}
+
+function normalizeSummary(summary: string, fallbackCategory?: string): string {
+  if (containsHangul(summary)) {
+    return summary;
+  }
+
+  return `${fallbackCategory ?? '이 장소'} 관련 추천 장소예요.`;
+}
+
+function containsHangul(value: string): boolean {
+  return /[가-힣]/.test(value);
+}
+
+function getKakaoCategoryLabel(raw: KakaoLocalDocument): string {
+  const category = `${raw.category_group_name ?? ''} ${raw.category_name ?? ''}`;
+
+  if (/공원|수목원|숲|산책|trail|park|forest/i.test(category)) return '공원 명소';
+  if (/강|하천|수변|호수|바다|river|stream|water/i.test(category)) return '수변 명소';
+  if (/광장|전망|축제|카페|음식점|restaurant|cafe|plaza|tower/i.test(category)) return '활기 명소';
+  if (/박물관|미술관|궁|문화|hotel|museum|gallery|palace/i.test(category)) return '문화 명소';
+  if (/병원|금융|업무|역|station|business|finance/i.test(category)) return '도심 명소';
+
+  return '추천 명소';
+}
+
+function getTourApiCategoryLabel(raw: TourApiItem): string {
+  const contentTypeId = String(raw.contenttypeid ?? '');
+
+  switch (contentTypeId) {
+    case '12':
+      return '관광 명소';
+    case '14':
+      return '문화 명소';
+    case '15':
+      return '축제 명소';
+    case '28':
+      return '레저 명소';
+    case '32':
+      return '휴식 명소';
+    case '38':
+      return '쇼핑 명소';
+    default:
+      return '추천 명소';
+  }
+}
+
+function getLocationLabel(location?: string): string {
+  if (!location) {
+    return '';
+  }
+
+  if (/서울/.test(location)) return '서울';
+  if (/부산/.test(location)) return '부산';
+  if (/인천/.test(location)) return '인천';
+  if (/대구/.test(location)) return '대구';
+  if (/대전/.test(location)) return '대전';
+  if (/광주/.test(location)) return '광주';
+  if (/울산/.test(location)) return '울산';
+  if (/제주/.test(location)) return '제주';
+
+  return location.split(' ')[0] ?? '';
 }
 
 export function mapRawExternalPoisToPlaceRecords(

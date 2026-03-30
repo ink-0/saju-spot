@@ -1,6 +1,6 @@
 import type { TourApiItem } from './provider-mappers';
 
-const TOUR_API_BASE_URL = 'https://apis.data.go.kr/B551011/KorService1';
+const TOUR_API_BASE_URL = 'https://apis.data.go.kr/B551011/KorService2';
 
 export interface TourApiSearchParams {
   numOfRows?: number;
@@ -43,18 +43,18 @@ export async function searchTourApiByKeyword(
   params: TourApiSearchParams,
   serviceKey = process.env.TOURAPI_SERVICE_KEY,
 ): Promise<TourApiSearchResponse> {
-  return requestTourApi('searchKeyword1', params, serviceKey);
+  return requestTourApi('searchKeyword2', params, serviceKey);
 }
 
 export async function searchTourApiByLocation(
   params: TourApiSearchParams,
   serviceKey = process.env.TOURAPI_SERVICE_KEY,
 ): Promise<TourApiSearchResponse> {
-  return requestTourApi('locationBasedList1', params, serviceKey);
+  return requestTourApi('locationBasedList2', params, serviceKey);
 }
 
 async function requestTourApi(
-  endpoint: 'searchKeyword1' | 'locationBasedList1',
+  endpoint: 'searchKeyword2' | 'locationBasedList2',
   params: TourApiSearchParams,
   serviceKey?: string,
 ): Promise<TourApiSearchResponse> {
@@ -80,15 +80,15 @@ async function requestTourApi(
 }
 
 function buildTourApiUrl(
-  endpoint: 'searchKeyword1' | 'locationBasedList1',
+  endpoint: 'searchKeyword2' | 'locationBasedList2',
   params: TourApiSearchParams,
   serviceKey: string,
 ): string {
   const searchParams = new URLSearchParams({
     serviceKey,
     _type: 'json',
-    MobileOS: params.MobileOS ?? 'ETC',
-    MobileApp: params.MobileApp ?? 'saju-spot',
+    MobileOS: params.MobileOS ?? 'WEB',
+    MobileApp: params.MobileApp ?? 'saju',
     numOfRows: String(params.numOfRows ?? 10),
     pageNo: String(params.pageNo ?? 1),
     arrange: params.arrange ?? 'A',
