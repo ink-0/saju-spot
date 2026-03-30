@@ -1,5 +1,6 @@
 import { PLACE_DATASET } from './places';
 import { calculatePlaceInfluence } from './place-influence';
+import { getElementTraitReasons } from './element-place-traits';
 import type {
   ElementKey,
   EnvironmentTranslationOutput,
@@ -179,6 +180,7 @@ function buildReasons(
     const primaryScore = placeInfluence.element_scores[primaryElement];
     const tone = primaryScore >= 4 ? '강하게' : '어느 정도';
     reasons.push(`부족한 ${toKoreanElement(primaryElement)} 기운을 ${tone} 채워주는 장소예요.`);
+    reasons.push(`${getElementTraitReasons(primaryElement)[0]} 특징이 부족한 기운과 잘 맞아요.`);
   }
 
   if (placeInfluence.explanation_factors.length > 0) {

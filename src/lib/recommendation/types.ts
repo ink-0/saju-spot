@@ -144,6 +144,26 @@ export interface ElementTraitDefinition {
   environment_cues: string[];
 }
 
+export interface ElementPlaceTraitDefinition {
+  label: string;
+  search_keywords: Array<{
+    keyword: string;
+    kakaoCategoryGroupCode?: string;
+    tourContentTypeId?: string;
+  }>;
+  curated_tags: string[];
+  preferred_categories: string[];
+  preferred_materials: MaterialTag[];
+  preferred_structures: StructureTag[];
+  preferred_activities: ActivityTag[];
+  preferred_time_preferences: TimePreferenceTag[];
+  preferred_temperature: TemperatureFeel[];
+  ideal_nature_ratio: number;
+  ideal_brightness: number;
+  ideal_crowd: number;
+  reason_phrases: string[];
+}
+
 export interface PlaceInfluenceProfile {
   axes: PlaceInfluenceAxes;
   element_scores: Record<ElementKey, number>;
@@ -174,6 +194,11 @@ export interface RecommendationResult {
 }
 
 export interface RecommendationOutput {
+  recommendations: RecommendationResult[];
+}
+
+export interface GroupedRecommendationOutput {
+  element: ElementKey;
   recommendations: RecommendationResult[];
 }
 

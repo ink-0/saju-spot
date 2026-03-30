@@ -3,6 +3,12 @@ export { runSajuCoreEngine } from './saju-analysis/saju-core';
 export { runInterpretationEngine } from './saju-analysis/interpretation';
 export { runEnvironmentTranslationEngine } from './saju-analysis/environment';
 export {
+  ELEMENT_PLACE_TRAITS,
+  buildElementSearchSpecs,
+  getElementTraitReasons,
+  scorePlaceAgainstElementTraits,
+} from './place-recommendation/element-place-traits';
+export {
   ELEMENT_TRAITS,
   calculatePlaceAxes,
   calculatePlaceInfluence,
@@ -41,6 +47,7 @@ export type {
   EnvironmentTranslationOutput,
   ExplanationInput,
   Gender,
+  GroupedRecommendationOutput,
   InterpretationConclusion,
   InterpretationOutput,
   PlaceInfluenceAxes,

@@ -9,7 +9,10 @@ import {
   runSajuCoreEngine,
   searchAndMapKakaoLocalDocuments,
   searchAndMapTourApiItemsByKeyword,
+  scorePlaceAgainstElementTraits,
+  buildElementSearchSpecs,
   type ElementKey,
+  type GroupedRecommendationOutput,
   type PlaceRecord,
   type SajuEngineInput,
 } from '@/lib/recommendation';
@@ -31,16 +34,21 @@ export async function POST(request: Request) {
     const sajuCore = runSajuCoreEngine(input);
     const interpretation = runInterpretationEngine(sajuCore);
     const environment = runEnvironmentTranslationEngine(interpretation);
-    const providerResult = await fetchProviderPlaces(input.location, interpretation.layer_a.missing_elements, interpretation.conclusion.yongshin);
+    const targetElements = interpretation.layer_a.missing_elements.length > 0
+      ? interpretation.layer_a.missing_elements
+      : [interpretation.conclusion.yongshin];
+    const providerResult = await fetchProviderPlaces(input.location, targetElements);
     const providerPlaces = providerResult.places;
     const placePool = providerPlaces.length > 0 ? providerPlaces : PLACE_DATASET;
     const recommendation = runRecommendationEngine(interpretation, environment, {}, placePool);
+    const grouped_recommendations = buildGroupedRecommendations(targetElements, interpretation, environment, placePool);
 
     return NextResponse.json({
       source: providerPlaces.length > 0 ? 'external' : 'fallback',
-      query_keyword: buildPrimaryKeyword(input.location, interpretation.layer_a.missing_elements, interpretation.conclusion.yongshin),
+      query_keyword: buildPrimaryKeyword(input.location, targetElements),
       provider_status: providerResult.status,
       recommendation,
+      grouped_recommendations,
     });
   } catch (error) {
     return NextResponse.json(
@@ -63,11 +71,11 @@ function normalizeRequestBody(body: RecommendationRequestBody): SajuEngineInput 
   };
 }
 
-async function fetchProviderPlaces(location: string, missingElements: ElementKey[], yongshin: ElementKey): Promise<{
+async function fetchProviderPlaces(location: string, targetElements: ElementKey[]): Promise<{
   places: PlaceRecord[];
   status: 'success' | 'partial' | 'empty' | 'failed';
 }> {
-  const searchSpecs = buildSearchSpecs(location, missingElements, yongshin);
+  const searchSpecs = targetElements.flatMap((element) => buildElementSearchSpecs(element, normalizeSearchLocation(location)));
 
   const kakaoTasks = searchSpecs.map((spec) =>
     searchAndMapKakaoLocalDocuments(
@@ -99,9 +107,9 @@ async function fetchProviderPlaces(location: string, missingElements: ElementKey
     ...extractPlaces(tourResults),
   ];
 
-  const targetElements = missingElements.length > 0 ? missingElements : [yongshin];
   const filtered = filterPlacesByTargetElements(merged, targetElements);
-  const deduped = dedupePlaces(filtered.length > 0 ? filtered : merged);
+  const ranked = rankPlacesByTargetElements(filtered.length > 0 ? filtered : merged, targetElements);
+  const deduped = dedupePlaces(ranked);
   const providerStatuses = [...kakaoResults, ...tourResults];
   const successCount = providerStatuses.filter((result) => result.status === 'fulfilled').length;
 
@@ -118,54 +126,30 @@ async function fetchProviderPlaces(location: string, missingElements: ElementKey
   };
 }
 
-function buildPrimaryKeyword(location: string, missingElements: ElementKey[], yongshin: ElementKey): string {
-  return buildSearchSpecs(location, missingElements, yongshin)[0]?.query ?? `${location} 명소`;
+function buildPrimaryKeyword(location: string, missingElements: ElementKey[]): string {
+  return buildElementSearchSpecs(missingElements[0], normalizeSearchLocation(location))[0]?.query ?? `${location} 명소`;
 }
 
-function buildSearchSpecs(location: string, missingElements: ElementKey[], yongshin: ElementKey) {
-  const targetElement = missingElements[0] ?? yongshin;
-  const baseLocation = normalizeSearchLocation(location);
-  const traitMap: Record<ElementKey, Array<{
-    keyword: string;
-    kakaoCategoryGroupCode?: string;
-    tourContentTypeId?: string;
-  }>> = {
-    wood: [
-      { keyword: '공원', kakaoCategoryGroupCode: 'AT4', tourContentTypeId: '12' },
-      { keyword: '숲길', kakaoCategoryGroupCode: 'AT4', tourContentTypeId: '12' },
-      { keyword: '수목원', kakaoCategoryGroupCode: 'AT4', tourContentTypeId: '12' },
-      { keyword: '생태공원', kakaoCategoryGroupCode: 'AT4', tourContentTypeId: '12' },
-    ],
-    fire: [
-      { keyword: '전망대', kakaoCategoryGroupCode: 'AT4', tourContentTypeId: '12' },
-      { keyword: '광장', kakaoCategoryGroupCode: 'AT4', tourContentTypeId: '12' },
-      { keyword: '야경 명소', kakaoCategoryGroupCode: 'AT4', tourContentTypeId: '12' },
-      { keyword: '루프탑', kakaoCategoryGroupCode: 'CE7', tourContentTypeId: '15' },
-    ],
-    earth: [
-      { keyword: '궁궐', kakaoCategoryGroupCode: 'CT1', tourContentTypeId: '14' },
-      { keyword: '박물관', kakaoCategoryGroupCode: 'CT1', tourContentTypeId: '14' },
-      { keyword: '고궁', kakaoCategoryGroupCode: 'AT4', tourContentTypeId: '12' },
-      { keyword: '정원', kakaoCategoryGroupCode: 'AT4', tourContentTypeId: '12' },
-    ],
-    metal: [
-      { keyword: '전시관', kakaoCategoryGroupCode: 'CT1', tourContentTypeId: '14' },
-      { keyword: '미술관', kakaoCategoryGroupCode: 'CT1', tourContentTypeId: '14' },
-      { keyword: '현대건축', kakaoCategoryGroupCode: 'AT4', tourContentTypeId: '12' },
-      { keyword: '도심 전망', kakaoCategoryGroupCode: 'AT4', tourContentTypeId: '12' },
-    ],
-    water: [
-      { keyword: '한강공원', kakaoCategoryGroupCode: 'AT4', tourContentTypeId: '12' },
-      { keyword: '수변', kakaoCategoryGroupCode: 'AT4', tourContentTypeId: '12' },
-      { keyword: '강변 산책로', kakaoCategoryGroupCode: 'AT4', tourContentTypeId: '12' },
-      { keyword: '천변', kakaoCategoryGroupCode: 'AT4', tourContentTypeId: '12' },
-    ],
-  };
+function buildGroupedRecommendations(
+  targetElements: ElementKey[],
+  interpretation: ReturnType<typeof runInterpretationEngine>,
+  environment: ReturnType<typeof runEnvironmentTranslationEngine>,
+  placePool: PlaceRecord[],
+): GroupedRecommendationOutput[] {
+  return targetElements.map((element) => {
+    const groupedInterpretation = {
+      ...interpretation,
+      layer_a: {
+        ...interpretation.layer_a,
+        missing_elements: [element],
+      },
+    };
 
-  return traitMap[targetElement].map((spec) => ({
-    ...spec,
-    query: `${baseLocation} ${spec.keyword}`,
-  }));
+    return {
+      element,
+      recommendations: runRecommendationEngine(groupedInterpretation, environment, {}, placePool).recommendations,
+    };
+  });
 }
 
 function extractPlaces(
@@ -187,6 +171,18 @@ function normalizeSearchLocation(location: string): string {
   }
 
   return location;
+}
+
+function rankPlacesByTargetElements(places: PlaceRecord[], targetElements: ElementKey[]): PlaceRecord[] {
+  return [...places].sort((left, right) => {
+    const leftScore = getBestTraitScore(left, targetElements);
+    const rightScore = getBestTraitScore(right, targetElements);
+    return rightScore - leftScore;
+  });
+}
+
+function getBestTraitScore(place: PlaceRecord, targetElements: ElementKey[]): number {
+  return Math.max(...targetElements.map((element) => scorePlaceAgainstElementTraits(place, element)));
 }
 
 function dedupePlaces(places: PlaceRecord[]): PlaceRecord[] {

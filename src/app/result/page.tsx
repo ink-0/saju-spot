@@ -26,7 +26,7 @@ import {
   type OhangSpots,
   type Spot,
 } from '@/lib/spots';
-import type { RecommendationResult } from '@/lib/recommendation';
+import type { GroupedRecommendationOutput, RecommendationResult } from '@/lib/recommendation';
 import type { OhangType } from '@/lib/ohang';
 import {
   analyzeSajuDetails,
@@ -41,6 +41,7 @@ export default function ResultPage() {
 
   const [ready, setReady] = useState(false);
   const [apiRecommendations, setApiRecommendations] = useState<RecommendationResult[]>([]);
+  const [apiGroupedRecommendations, setApiGroupedRecommendations] = useState<GroupedRecommendationOutput[]>([]);
   const [apiRecommendationSource, setApiRecommendationSource] = useState<'external' | 'fallback' | null>(null);
   const [apiRecommendationQuery, setApiRecommendationQuery] = useState('');
   const [apiRecommendationLoading, setApiRecommendationLoading] = useState(false);
@@ -174,11 +175,13 @@ export default function ResultPage() {
           recommendation: {
             recommendations: RecommendationResult[];
           };
+          grouped_recommendations: GroupedRecommendationOutput[];
         };
 
         setApiRecommendationSource(data.source);
         setApiRecommendationQuery(data.query_keyword);
         setApiRecommendations(data.recommendation.recommendations);
+        setApiGroupedRecommendations(data.grouped_recommendations);
         setApiRecommendationError(
           data.source === 'fallback'
             ? data.provider_status === 'empty'
@@ -192,6 +195,7 @@ export default function ResultPage() {
         setApiRecommendationError(error instanceof Error ? error.message : '추천 데이터를 불러오지 못했어요.');
         setApiRecommendationSource(null);
         setApiRecommendations([]);
+        setApiGroupedRecommendations([]);
       } finally {
         setApiRecommendationLoading(false);
       }
@@ -465,7 +469,32 @@ export default function ResultPage() {
             </div>
           )}
 
-          {apiRecommendations.length > 0 && (
+          {apiGroupedRecommendations.length > 0 ? (
+            <div className="space-y-6">
+              {apiGroupedRecommendations.map((group) => {
+                const ohang = toOhangType(group.element);
+                const color = OHANG_COLOR[ohang];
+
+                return (
+                  <div key={`group-${group.element}`} className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">{OHANG_EMOJI[ohang]}</span>
+                      <h3 className={`font-semibold ${color.text}`}>부족한 {ohang} 기운 추천</h3>
+                    </div>
+                    <div className="space-y-3">
+                      {group.recommendations.map((recommendation, index) => (
+                        <ApiRecommendationCard
+                          key={`${group.element}-${recommendation.id}-${recommendation.name}`}
+                          recommendation={recommendation}
+                          index={index}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : apiRecommendations.length > 0 && (
             <div className="space-y-3">
               {apiRecommendations.map((recommendation, index) => (
                 <ApiRecommendationCard key={`${recommendation.id}-${recommendation.name}`} recommendation={recommendation} index={index} />
