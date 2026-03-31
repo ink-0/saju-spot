@@ -554,6 +554,7 @@ export default function ResultPage() {
 }
 
 function ApiRecommendationCard({ recommendation, index }: { recommendation: RecommendationResult; index: number }) {
+  const [open, setOpen] = useState(false);
   const dominantElement = recommendation.supported_missing_elements[0] ?? recommendation.dominant_elements[0] ?? recommendation.tags.element[0] ?? 'earth';
   const dominantColor = OHANG_COLOR[toOhangType(dominantElement)];
   const shownElements = recommendation.supported_missing_elements.length > 0
@@ -561,47 +562,96 @@ function ApiRecommendationCard({ recommendation, index }: { recommendation: Reco
     : recommendation.dominant_elements.length > 0
       ? recommendation.dominant_elements
       : recommendation.tags.element;
+  const placeCharacterTags = getPlaceCharacterTags(recommendation);
 
   return (
-    <div className={`glass rounded-2xl overflow-hidden border ${dominantColor.border}`}>
-      <div className="px-5 py-4 border-b border-white/5 flex items-start justify-between gap-4">
-        <div>
-          <p className="text-xs text-gray-500 mb-1">추천 {index + 1}</p>
-          <p className="font-semibold text-white">{recommendation.name}</p>
-          <p className="text-xs text-gray-500 mt-1">{recommendation.location}</p>
-          {recommendation.supported_missing_elements.length > 0 && (
-            <p className={`text-xs mt-2 ${dominantColor.text}`}>
-              부족한 {recommendation.supported_missing_elements.map((element) => toOhangType(element)).join(', ')} 기운 보강
-            </p>
-          )}
-        </div>
-        <span className={`text-xs px-2.5 py-1 rounded-full ${dominantColor.bg} ${dominantColor.text}`}>
-          {recommendation.score.toFixed(2)}점
-        </span>
-      </div>
-      <div className="px-5 py-4 space-y-3">
-        <div className="flex flex-wrap gap-2">
-          {shownElements.map((element) => {
-            const ohang = toOhangType(element);
-            return (
-              <span key={`${recommendation.id}-${element}`} className={`text-xs px-2 py-0.5 rounded-full ${OHANG_COLOR[ohang].bg} ${OHANG_COLOR[ohang].text}`}>
-                {OHANG_EMOJI[ohang]} {ohang}
+    <div className={`glass rounded-2xl overflow-hidden border transition-all duration-300 ${open ? dominantColor.border : 'border-white/8'}`}>
+      <button onClick={() => setOpen(!open)} className="w-full text-left px-5 py-4 flex items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-3">
+            <span className="text-gray-500 text-sm w-5 shrink-0">{index + 1}.</span>
+            <div className="min-w-0">
+              <p className="font-semibold text-white truncate">{recommendation.name}</p>
+              <p className="text-xs text-gray-500 mt-0.5 truncate">{recommendation.location}</p>
+              {recommendation.supported_missing_elements.length > 0 && (
+                <p className={`text-xs mt-2 ${dominantColor.text}`}>
+                  부족한 {recommendation.supported_missing_elements.map((element) => toOhangType(element)).join(', ')} 기운 보강
+                </p>
+              )}
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2 mt-3 pl-8">
+            {placeCharacterTags.map((tag) => (
+              <span key={`${recommendation.id}-${tag}`} className="text-xs bg-white/5 text-gray-400 px-2 py-0.5 rounded-full">
+                {tag}
               </span>
-            );
-          })}
+            ))}
+          </div>
         </div>
-        <div className="grid grid-cols-2 gap-2 text-xs text-gray-400">
-          <div className="rounded-xl bg-white/5 px-3 py-2">부족 기운 보강 {recommendation.breakdown.replenishment_score.toFixed(1)}/5</div>
-          <div className="rounded-xl bg-white/5 px-3 py-2">환경 적합 {recommendation.breakdown.environment_fit.toFixed(1)}/5</div>
+        <div className="flex items-center gap-2 shrink-0 pl-2">
+          <span className={`text-xs px-2.5 py-1 rounded-full ${dominantColor.bg} ${dominantColor.text}`}>
+            {recommendation.score.toFixed(2)}점
+          </span>
+          <span className="text-gray-500 text-sm">{open ? '▲' : '▼'}</span>
         </div>
-        <div className="space-y-2">
-          {recommendation.reason.slice(0, 3).map((reason) => (
-            <p key={reason} className="text-sm text-gray-300 leading-relaxed">- {reason}</p>
-          ))}
+      </button>
+      {open && (
+        <div className="px-5 pb-5 space-y-3 border-t border-white/5">
+          <div className="pt-3 flex flex-wrap gap-2">
+            {shownElements.map((element) => {
+              const ohang = toOhangType(element);
+              return (
+                <span key={`${recommendation.id}-${element}`} className={`text-xs px-2 py-0.5 rounded-full ${OHANG_COLOR[ohang].bg} ${OHANG_COLOR[ohang].text}`}>
+                  {OHANG_EMOJI[ohang]} {ohang}
+                </span>
+              );
+            })}
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-xs text-gray-400">
+            <div className="rounded-xl bg-white/5 px-3 py-2">부족 기운 보강 {recommendation.breakdown.replenishment_score.toFixed(1)}/5</div>
+            <div className="rounded-xl bg-white/5 px-3 py-2">환경 적합 {recommendation.breakdown.environment_fit.toFixed(1)}/5</div>
+          </div>
+          <div className="space-y-2">
+            {recommendation.reason.map((reason) => (
+              <p key={reason} className="text-sm text-gray-300 leading-relaxed">- {reason}</p>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
+}
+
+function getPlaceCharacterTags(recommendation: RecommendationResult): string[] {
+  const tags: string[] = [];
+
+  if (recommendation.tags.nature_ratio >= 4) {
+    tags.push('자연');
+  } else if (recommendation.tags.nature_ratio <= 1) {
+    tags.push('도심');
+  }
+
+  if (recommendation.tags.material.includes('water')) {
+    tags.push('수변');
+  }
+
+  if (recommendation.tags.brightness >= 4) {
+    tags.push('전망');
+  }
+
+  if (recommendation.tags.material.includes('glass') || recommendation.tags.material.includes('metal') || recommendation.tags.material.includes('stone')) {
+    tags.push('건물');
+  }
+
+  if (recommendation.tags.activity.includes('rest')) {
+    tags.push('휴식');
+  }
+
+  if (recommendation.tags.activity.includes('explore')) {
+    tags.push('산책');
+  }
+
+  return [...new Set(tags)].slice(0, 4);
 }
 
 function toOhangType(element: string): OhangType {
