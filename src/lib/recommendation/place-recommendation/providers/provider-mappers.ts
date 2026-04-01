@@ -46,21 +46,26 @@ export function mapKakaoLocalDocumentToPlaceRecord(
   raw: KakaoLocalDocument,
   override: PlaceRecordOverride = {},
 ): PlaceRecord {
-  return mapExternalPoiToPlaceRecord(normalizeKakaoLocalDocument(raw), override);
+  const normalized = normalizeKakaoLocalDocument(raw);
+  return mapExternalPoiToPlaceRecord(normalized, applyKnownPlaceOverride(normalized, override));
 }
 
 export function mapKakaoLocalDocumentsToPlaceRecords(
   raws: KakaoLocalDocument[],
   overrides: Record<string, PlaceRecordOverride> = {},
 ): PlaceRecord[] {
-  return mapExternalPoisToPlaceRecords(raws.map(normalizeKakaoLocalDocument), overrides);
+  return raws.map((raw) => {
+    const normalized = normalizeKakaoLocalDocument(raw);
+    return mapExternalPoiToPlaceRecord(normalized, applyKnownPlaceOverride(normalized, overrides[String(normalized.id ?? normalized.name)]));
+  });
 }
 
 export function mapTourApiItemToPlaceRecord(
   raw: TourApiItem,
   override: PlaceRecordOverride = {},
 ): PlaceRecord {
-  return mapExternalPoiToPlaceRecord(normalizeTourApiItem(raw), mergeTourApiOverride(raw, override));
+  const normalized = normalizeTourApiItem(raw);
+  return mapExternalPoiToPlaceRecord(normalized, applyKnownPlaceOverride(normalized, mergeTourApiOverride(raw, override)));
 }
 
 export function mapTourApiItemsToPlaceRecords(
@@ -69,7 +74,7 @@ export function mapTourApiItemsToPlaceRecords(
 ): PlaceRecord[] {
   return raws.map((raw) => {
     const normalized = normalizeTourApiItem(raw);
-    return mapExternalPoiToPlaceRecord(normalized, mergeTourApiOverride(raw, overrides[String(normalized.id ?? normalized.name)]));
+    return mapExternalPoiToPlaceRecord(normalized, applyKnownPlaceOverride(normalized, mergeTourApiOverride(raw, overrides[String(normalized.id ?? normalized.name)])));
   });
 }
 
@@ -266,6 +271,91 @@ function getLocationLabel(location?: string): string {
   if (/제주/.test(location)) return '제주';
 
   return location.split(' ')[0] ?? '';
+}
+
+function getKnownPlaceOverride(rawName: string, location?: string): PlaceRecordOverride {
+  const normalized = `${rawName} ${location ?? ''}`;
+
+  if (/더플라자|plaza/i.test(normalized)) {
+    return {
+      element: ['metal', 'earth'],
+      material: ['metal', 'glass', 'stone'],
+      structure: 'linear',
+      temperature_feel: 'cool',
+      fengshui_signals: ['flagship_site', 'sheltered_site'],
+    };
+  }
+
+  if (/시그니엘|signiel/i.test(normalized)) {
+    return {
+      element: ['metal', 'fire'],
+      material: ['metal', 'glass'],
+      structure: 'linear',
+      brightness: 5,
+      fengshui_signals: ['flagship_site'],
+    };
+  }
+
+  if (/웨스틴조선|westin/i.test(normalized)) {
+    return {
+      element: ['metal', 'earth'],
+      material: ['metal', 'stone'],
+      structure: 'linear',
+      fengshui_signals: ['flagship_site', 'sheltered_site'],
+    };
+  }
+
+  if (/파르나스|parnas/i.test(normalized)) {
+    return {
+      element: ['water', 'metal'],
+      material: ['water', 'glass', 'metal'],
+      structure: 'mixed',
+      temperature_feel: 'cool',
+      fengshui_signals: ['flagship_site', 'water_edge'],
+    };
+  }
+
+  if (/북한산|인왕산|수락산/i.test(normalized)) {
+    return {
+      element: ['metal'],
+      material: ['stone'],
+      activity: ['explore'],
+      fengshui_signals: ['rock_exposed'],
+    };
+  }
+
+  if (/관악산/i.test(normalized)) {
+    return {
+      element: ['fire', 'metal'],
+      material: ['stone'],
+      activity: ['explore'],
+      fengshui_signals: ['flame_ridge', 'rock_exposed'],
+    };
+  }
+
+  if (/한강|청계천|선착장|수변|천변/i.test(normalized)) {
+    return {
+      element: ['water'],
+      material: ['water'],
+      activity: ['rest', 'explore'],
+      fengshui_signals: ['water_edge'],
+    };
+  }
+
+  return {};
+}
+
+function applyKnownPlaceOverride(raw: RawExternalPoi, override: PlaceRecordOverride = {}): PlaceRecordOverride {
+  const knownOverride = getKnownPlaceOverride(raw.name, raw.location);
+  return {
+    ...knownOverride,
+    ...override,
+    element: override.element ?? knownOverride.element,
+    material: override.material ?? knownOverride.material,
+    activity: override.activity ?? knownOverride.activity,
+    time_preference: override.time_preference ?? knownOverride.time_preference,
+    fengshui_signals: override.fengshui_signals ?? knownOverride.fengshui_signals,
+  };
 }
 
 export function mapRawExternalPoisToPlaceRecords(

@@ -2,6 +2,7 @@ import type {
   ActivityTag,
   ElementKey,
   ElementTraitDefinition,
+  FengshuiSignal,
   MaterialTag,
   PlaceAxisKey,
   PlaceInfluenceAxes,
@@ -81,6 +82,27 @@ const STRUCTURE_AXIS_MAP: Record<StructureTag, AxisDelta> = {
 };
 
 const EXPLICIT_ELEMENT_PRIOR = 2.4;
+const FENGSHUI_SIGNAL_WEIGHT = 0.8;
+
+const FENGSHUI_SIGNAL_AXIS_MAP: Record<FengshuiSignal, AxisDelta> = {
+  flame_ridge: { thermal: 0.9, brightness: 0.8, stimulation: 0.4, grounding: 0.2 },
+  rock_exposed: { grounding: 0.9, brightness: 0.4, thermal: -0.2, naturalness: 0.1 },
+  water_edge: { thermal: -0.9, naturalness: 0.5, grounding: -0.4, stimulation: -0.2 },
+  water_encircled: { thermal: -0.8, naturalness: 0.3, grounding: 0.4, stimulation: -0.3 },
+  water_confluence: { thermal: -0.7, naturalness: 0.4, grounding: 0.2, sociability: 0.2 },
+  sheltered_site: { grounding: 0.9, stimulation: -0.3, sociability: -0.1 },
+  flagship_site: { brightness: 0.4, grounding: 0.4, sociability: 0.2 },
+};
+
+const FENGSHUI_SIGNAL_ELEMENT_BONUS: Partial<Record<FengshuiSignal, Partial<Record<ElementKey, number>>>> = {
+  flame_ridge: { fire: 0.6 },
+  rock_exposed: { metal: 0.6 },
+  water_edge: { water: 0.5, wood: 0.2 },
+  water_encircled: { water: 0.7 },
+  water_confluence: { water: 0.8 },
+  sheltered_site: { earth: 0.7 },
+  flagship_site: { metal: 0.3, earth: 0.2 },
+};
 
 export function calculatePlaceInfluence(place: PlaceRecord): PlaceInfluenceProfile {
   const axes = calculatePlaceAxes(place);
@@ -91,8 +113,10 @@ export function calculatePlaceInfluence(place: PlaceRecord): PlaceInfluenceProfi
     explicitScores[element] += EXPLICIT_ELEMENT_PRIOR;
   }
 
+  const fengshuiScores = calculateElementScoresFromSignals(place.tags.fengshui_signals ?? []);
+
   const axisScores = calculateElementScoresFromAxes(axes);
-  const element_scores = normalizeElementScores(mergeElementScores(explicitScores, axisScores));
+  const element_scores = normalizeElementScores(mergeElementScores(mergeElementScores(explicitScores, axisScores), fengshuiScores));
   const dominant_elements = getDominantElements(element_scores);
 
   return {
@@ -129,6 +153,10 @@ export function calculatePlaceAxes(place: PlaceRecord): PlaceInfluenceAxes {
     applyAxisDelta(axes, TIME_AXIS_MAP[timePreference], 1 / place.tags.time_preference.length);
   }
 
+  for (const signal of place.tags.fengshui_signals ?? []) {
+    applyAxisDelta(axes, FENGSHUI_SIGNAL_AXIS_MAP[signal], FENGSHUI_SIGNAL_WEIGHT);
+  }
+
   axes.grounding += clamp((3 - place.tags.crowd) * 0.25, -0.6, 0.8);
 
   return {
@@ -139,6 +167,23 @@ export function calculatePlaceAxes(place: PlaceRecord): PlaceInfluenceAxes {
     naturalness: clamp(axes.naturalness, -AXIS_LIMIT, AXIS_LIMIT),
     grounding: clamp(axes.grounding, -AXIS_LIMIT, AXIS_LIMIT),
   };
+}
+
+function calculateElementScoresFromSignals(signals: FengshuiSignal[]): Record<ElementKey, number> {
+  const scores = createEmptyElementScores();
+
+  for (const signal of signals) {
+    const bonus = FENGSHUI_SIGNAL_ELEMENT_BONUS[signal];
+    if (!bonus) {
+      continue;
+    }
+
+    for (const [element, value] of Object.entries(bonus) as Array<[ElementKey, number]>) {
+      scores[element] += value;
+    }
+  }
+
+  return scores;
 }
 
 function calculateElementScoresFromAxes(axes: PlaceInfluenceAxes): Record<ElementKey, number> {
@@ -206,6 +251,10 @@ function collectObservableFactors(place: PlaceRecord): string[] {
     factors.push(`${place.tags.material.join('/')} materials`);
   }
 
+  for (const signal of place.tags.fengshui_signals ?? []) {
+    factors.push(signalToFactor(signal));
+  }
+
   factors.push(`${place.tags.structure} structure`);
   factors.push(`${place.tags.temperature_feel} thermal feel`);
 
@@ -255,4 +304,18 @@ function clamp(value: number, min: number, max: number): number {
 
 function roundScore(value: number): number {
   return Math.round(value * 100) / 100;
+}
+
+function signalToFactor(signal: FengshuiSignal): string {
+  const mapping: Record<FengshuiSignal, string> = {
+    flame_ridge: '화형산 지형',
+    rock_exposed: '바위 능선',
+    water_edge: '수변 인접',
+    water_encircled: '환포형 수변',
+    water_confluence: '삼수합류형 수세',
+    sheltered_site: '배산임수형 입지',
+    flagship_site: '명당급 랜드마크',
+  };
+
+  return mapping[signal];
 }

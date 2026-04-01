@@ -11,6 +11,14 @@ export type TemperatureFeel = 'cool' | 'warm' | 'neutral';
 export type StructureTag = 'linear' | 'organic' | 'mixed';
 export type MaterialTag = 'metal' | 'wood' | 'stone' | 'water' | 'glass' | 'earth';
 export type PlaceAxisKey = 'thermal' | 'brightness' | 'stimulation' | 'sociability' | 'naturalness' | 'grounding';
+export type FengshuiSignal =
+  | 'flame_ridge'
+  | 'rock_exposed'
+  | 'water_edge'
+  | 'water_encircled'
+  | 'water_confluence'
+  | 'sheltered_site'
+  | 'flagship_site';
 
 export interface SajuEngineInput {
   birth_date: string;
@@ -125,6 +133,7 @@ export interface PlaceRecord {
     time_preference: TimePreferenceTag[];
     temperature_feel: TemperatureFeel;
     structure: StructureTag;
+    fengshui_signals?: FengshuiSignal[];
   };
 }
 

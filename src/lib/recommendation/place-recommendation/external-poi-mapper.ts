@@ -1,5 +1,6 @@
 import type {
   ActivityTag,
+  FengshuiSignal,
   MaterialTag,
   PlaceRecord,
   StructureTag,
@@ -27,6 +28,7 @@ export interface PlaceRecordOverride {
   time_preference?: TimePreferenceTag[];
   temperature_feel?: TemperatureFeel;
   structure?: StructureTag;
+  fengshui_signals?: FengshuiSignal[];
 }
 
 const CATEGORY_DEFAULTS: Array<{
@@ -115,6 +117,7 @@ const FALLBACK_TAGS: PlaceRecord['tags'] = {
   time_preference: ['day', 'night'],
   temperature_feel: 'neutral',
   structure: 'mixed',
+  fengshui_signals: [],
 };
 
 export function mapExternalPoiToPlaceRecord(raw: RawExternalPoi, override: PlaceRecordOverride = {}): PlaceRecord {
@@ -127,6 +130,7 @@ export function mapExternalPoiToPlaceRecord(raw: RawExternalPoi, override: Place
     material: override.material ?? inferred.material ?? FALLBACK_TAGS.material,
     activity: override.activity ?? inferred.activity ?? FALLBACK_TAGS.activity,
     time_preference: override.time_preference ?? inferred.time_preference ?? FALLBACK_TAGS.time_preference,
+    fengshui_signals: override.fengshui_signals ?? inferred.fengshui_signals ?? FALLBACK_TAGS.fengshui_signals,
   };
 
   return {
@@ -172,6 +176,7 @@ function mergeOverrides(overrides: PlaceRecordOverride[]): PlaceRecordOverride {
     material: uniqueArray([...(merged.material ?? []), ...(current.material ?? [])]),
     activity: uniqueArray([...(merged.activity ?? []), ...(current.activity ?? [])]),
     time_preference: uniqueArray([...(merged.time_preference ?? []), ...(current.time_preference ?? [])]),
+    fengshui_signals: uniqueArray([...(merged.fengshui_signals ?? []), ...(current.fengshui_signals ?? [])]),
   }), {});
 }
 
