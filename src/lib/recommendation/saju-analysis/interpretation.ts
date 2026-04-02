@@ -6,7 +6,7 @@ import type {
   ElementKey,
   InterpretationOutput,
   SajuCoreOutput,
-} from './types';
+} from '../types';
 
 const STEM_ELEMENT: Record<string, ElementKey> = {
   갑: 'wood', 을: 'wood', 병: 'fire', 정: 'fire', 무: 'earth', 기: 'earth', 경: 'metal', 신: 'metal', 임: 'water', 계: 'water',

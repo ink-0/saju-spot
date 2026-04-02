@@ -10,6 +10,15 @@ export type ActivityTag = 'rest' | 'explore';
 export type TemperatureFeel = 'cool' | 'warm' | 'neutral';
 export type StructureTag = 'linear' | 'organic' | 'mixed';
 export type MaterialTag = 'metal' | 'wood' | 'stone' | 'water' | 'glass' | 'earth';
+export type PlaceAxisKey = 'thermal' | 'brightness' | 'stimulation' | 'sociability' | 'naturalness' | 'grounding';
+export type FengshuiSignal =
+  | 'flame_ridge'
+  | 'rock_exposed'
+  | 'water_edge'
+  | 'water_encircled'
+  | 'water_confluence'
+  | 'sheltered_site'
+  | 'flagship_site';
 
 export interface SajuEngineInput {
   birth_date: string;
@@ -114,6 +123,11 @@ export interface PlaceRecord {
   name: string;
   location: string;
   summary: string;
+  coordinates?: {
+    lng: number;
+    lat: number;
+  };
+  context_signals?: PlaceContextSignals;
   tags: {
     element: ElementKey[];
     nature_ratio: number;
@@ -124,12 +138,69 @@ export interface PlaceRecord {
     time_preference: TimePreferenceTag[];
     temperature_feel: TemperatureFeel;
     structure: StructureTag;
+    fengshui_signals?: FengshuiSignal[];
   };
 }
 
+export interface PlaceContextSignals {
+  water_proximity: number;
+  green_proximity: number;
+  mountain_proximity: number;
+  ridge_score: number;
+  city_core_score: number;
+  landmark_prestige: number;
+  quietness_score: number;
+}
+
+export interface PlaceInfluenceAxes {
+  thermal: number;
+  brightness: number;
+  stimulation: number;
+  sociability: number;
+  naturalness: number;
+  grounding: number;
+}
+
+export interface ElementTraitDefinition {
+  label: string;
+  core_keywords: string[];
+  direct_signals: string[];
+  environment_cues: string[];
+}
+
+export interface ElementPlaceTraitDefinition {
+  label: string;
+  search_keywords: Array<{
+    keyword: string;
+    kakaoCategoryGroupCode?: string;
+    tourContentTypeId?: string;
+  }>;
+  curated_tags: string[];
+  preferred_categories: string[];
+  preferred_materials: MaterialTag[];
+  preferred_structures: StructureTag[];
+  preferred_activities: ActivityTag[];
+  preferred_time_preferences: TimePreferenceTag[];
+  preferred_temperature: TemperatureFeel[];
+  ideal_nature_ratio: number;
+  ideal_brightness: number;
+  ideal_crowd: number;
+  reason_phrases: string[];
+}
+
+export interface PlaceInfluenceProfile {
+  axes: PlaceInfluenceAxes;
+  element_scores: Record<ElementKey, number>;
+  dominant_elements: ElementKey[];
+  observable_traits: PlaceRecord['tags'];
+  explanation_factors: string[];
+}
+
 export interface RecommendationBreakdown {
+  replenishment_score: number;
   missing_element_match: number;
-  favorable_element_match: number;
+  supportive_element_match: number;
+  environment_fit: number;
   excess_element_control: number;
   user_preference: number;
 }
@@ -138,13 +209,21 @@ export interface RecommendationResult {
   id: string;
   name: string;
   location: string;
+  summary: string;
   score: number;
   reason: string[];
   breakdown: RecommendationBreakdown;
+  dominant_elements: ElementKey[];
+  supported_missing_elements: ElementKey[];
   tags: PlaceRecord['tags'];
 }
 
 export interface RecommendationOutput {
+  recommendations: RecommendationResult[];
+}
+
+export interface GroupedRecommendationOutput {
+  element: ElementKey;
   recommendations: RecommendationResult[];
 }
 

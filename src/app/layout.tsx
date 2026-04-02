@@ -1,13 +1,5 @@
 import type { Metadata } from 'next';
-import { Inter, Noto_Serif_KR } from 'next/font/google';
 import './globals.css';
-
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
-const notoSerifKR = Noto_Serif_KR({
-  subsets: ['latin'],
-  weight: ['400', '700'],
-  variable: '--font-noto-serif-kr',
-});
 
 export const metadata: Metadata = {
   title: '사주풍수 — 내 사주에 맞는 서울 명소',
@@ -27,7 +19,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ko" className={`${inter.variable} ${notoSerifKR.variable}`}>
+    <html lang="ko">
       <body className="bg-[#0a0a0f] text-white antialiased">{children}</body>
     </html>
   );
