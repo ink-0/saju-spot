@@ -123,6 +123,10 @@ export interface PlaceRecord {
   name: string;
   location: string;
   summary: string;
+  coordinates?: {
+    lng: number;
+    lat: number;
+  };
   tags: {
     element: ElementKey[];
     nature_ratio: number;

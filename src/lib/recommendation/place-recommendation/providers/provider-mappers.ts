@@ -1,4 +1,7 @@
 import {
+  enrichPlaceWithCoordinateSignals,
+} from '../coordinate-enrichment';
+import {
   mapExternalPoiToPlaceRecord,
   mapExternalPoisToPlaceRecords,
   type PlaceRecordOverride,
@@ -47,7 +50,9 @@ export function mapKakaoLocalDocumentToPlaceRecord(
   override: PlaceRecordOverride = {},
 ): PlaceRecord {
   const normalized = normalizeKakaoLocalDocument(raw);
-  return mapExternalPoiToPlaceRecord(normalized, applyKnownPlaceOverride(normalized, override));
+  return enrichPlaceWithCoordinateSignals(
+    mapExternalPoiToPlaceRecord(normalized, applyKnownPlaceOverride(normalized, override)),
+  );
 }
 
 export function mapKakaoLocalDocumentsToPlaceRecords(
@@ -56,7 +61,9 @@ export function mapKakaoLocalDocumentsToPlaceRecords(
 ): PlaceRecord[] {
   return raws.map((raw) => {
     const normalized = normalizeKakaoLocalDocument(raw);
-    return mapExternalPoiToPlaceRecord(normalized, applyKnownPlaceOverride(normalized, overrides[String(normalized.id ?? normalized.name)]));
+    return enrichPlaceWithCoordinateSignals(
+      mapExternalPoiToPlaceRecord(normalized, applyKnownPlaceOverride(normalized, overrides[String(normalized.id ?? normalized.name)])),
+    );
   });
 }
 
@@ -65,7 +72,9 @@ export function mapTourApiItemToPlaceRecord(
   override: PlaceRecordOverride = {},
 ): PlaceRecord {
   const normalized = normalizeTourApiItem(raw);
-  return mapExternalPoiToPlaceRecord(normalized, applyKnownPlaceOverride(normalized, mergeTourApiOverride(raw, override)));
+  return enrichPlaceWithCoordinateSignals(
+    mapExternalPoiToPlaceRecord(normalized, applyKnownPlaceOverride(normalized, mergeTourApiOverride(raw, override))),
+  );
 }
 
 export function mapTourApiItemsToPlaceRecords(
@@ -74,7 +83,9 @@ export function mapTourApiItemsToPlaceRecords(
 ): PlaceRecord[] {
   return raws.map((raw) => {
     const normalized = normalizeTourApiItem(raw);
-    return mapExternalPoiToPlaceRecord(normalized, applyKnownPlaceOverride(normalized, mergeTourApiOverride(raw, overrides[String(normalized.id ?? normalized.name)])));
+    return enrichPlaceWithCoordinateSignals(
+      mapExternalPoiToPlaceRecord(normalized, applyKnownPlaceOverride(normalized, mergeTourApiOverride(raw, overrides[String(normalized.id ?? normalized.name)]))),
+    );
   });
 }
 
@@ -119,6 +130,7 @@ export function normalizeKakaoLocalDocument(raw: KakaoLocalDocument): RawExterna
     category: [raw.category_group_name, raw.category_name].filter(Boolean).join(' / '),
     description: buildKakaoDescription(raw),
     hours: inferKakaoHours(raw),
+    coordinates: parseCoordinates(raw.x, raw.y),
   };
 }
 
@@ -133,6 +145,25 @@ export function normalizeTourApiItem(raw: TourApiItem): RawExternalPoi {
     category: [raw.contenttypeid, raw.cat1, raw.cat2, raw.cat3].filter(Boolean).join(' / '),
     description: raw.overview,
     hours: raw.usetime || inferTourApiHours(raw),
+    coordinates: parseCoordinates(raw.mapx, raw.mapy),
+  };
+}
+
+function parseCoordinates(lng: string | number | undefined, lat: string | number | undefined) {
+  if (lng == null || lat == null) {
+    return undefined;
+  }
+
+  const parsedLng = Number(lng);
+  const parsedLat = Number(lat);
+
+  if (Number.isNaN(parsedLng) || Number.isNaN(parsedLat)) {
+    return undefined;
+  }
+
+  return {
+    lng: parsedLng,
+    lat: parsedLat,
   };
 }
 

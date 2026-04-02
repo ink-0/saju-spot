@@ -9,6 +9,10 @@ export {
   scorePlaceAgainstElementTraits,
 } from './place-recommendation/element-place-traits';
 export {
+  enrichPlaceWithCoordinateSignals,
+  inferSignalsFromCoordinates,
+} from './place-recommendation/coordinate-enrichment';
+export {
   ELEMENT_TRAITS,
   calculatePlaceAxes,
   calculatePlaceInfluence,

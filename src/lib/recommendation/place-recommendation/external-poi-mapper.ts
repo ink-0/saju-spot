@@ -16,6 +16,10 @@ export interface RawExternalPoi {
   category?: string;
   description?: string;
   hours?: string;
+  coordinates?: {
+    lng: number;
+    lat: number;
+  };
 }
 
 export interface PlaceRecordOverride {
@@ -138,6 +142,7 @@ export function mapExternalPoiToPlaceRecord(raw: RawExternalPoi, override: Place
     name: raw.name,
     location: raw.location ?? 'Unknown location',
     summary: raw.summary ?? raw.description ?? raw.category ?? raw.name,
+    coordinates: raw.coordinates,
     tags: mergedTags,
   };
 }
