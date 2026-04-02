@@ -157,6 +157,16 @@ export function calculatePlaceAxes(place: PlaceRecord): PlaceInfluenceAxes {
     applyAxisDelta(axes, FENGSHUI_SIGNAL_AXIS_MAP[signal], FENGSHUI_SIGNAL_WEIGHT);
   }
 
+  if (place.context_signals) {
+    axes.naturalness += place.context_signals.green_proximity * 0.15;
+    axes.thermal -= place.context_signals.water_proximity * 0.12;
+    axes.grounding += place.context_signals.mountain_proximity * 0.12;
+    axes.brightness += place.context_signals.ridge_score * 0.08;
+    axes.grounding += place.context_signals.city_core_score * 0.08;
+    axes.sociability += place.context_signals.landmark_prestige * 0.05;
+    axes.stimulation -= place.context_signals.quietness_score * 0.08;
+  }
+
   axes.grounding += clamp((3 - place.tags.crowd) * 0.25, -0.6, 0.8);
 
   return {
@@ -249,6 +259,24 @@ function collectObservableFactors(place: PlaceRecord): string[] {
 
   if (place.tags.material.length > 0) {
     factors.push(`${place.tags.material.join('/')} materials`);
+  }
+
+  if (place.context_signals) {
+    if (place.context_signals.water_proximity >= 4) {
+      factors.push('strong waterside context');
+    }
+    if (place.context_signals.green_proximity >= 4) {
+      factors.push('strong green context');
+    }
+    if (place.context_signals.mountain_proximity >= 4) {
+      factors.push('strong mountain context');
+    }
+    if (place.context_signals.city_core_score >= 4) {
+      factors.push('strong city-core context');
+    }
+    if (place.context_signals.landmark_prestige >= 4) {
+      factors.push('high landmark prestige');
+    }
   }
 
   for (const signal of place.tags.fengshui_signals ?? []) {

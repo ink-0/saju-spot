@@ -127,6 +127,7 @@ export interface PlaceRecord {
     lng: number;
     lat: number;
   };
+  context_signals?: PlaceContextSignals;
   tags: {
     element: ElementKey[];
     nature_ratio: number;
@@ -139,6 +140,16 @@ export interface PlaceRecord {
     structure: StructureTag;
     fengshui_signals?: FengshuiSignal[];
   };
+}
+
+export interface PlaceContextSignals {
+  water_proximity: number;
+  green_proximity: number;
+  mountain_proximity: number;
+  ridge_score: number;
+  city_core_score: number;
+  landmark_prestige: number;
+  quietness_score: number;
 }
 
 export interface PlaceInfluenceAxes {
@@ -198,6 +209,7 @@ export interface RecommendationResult {
   id: string;
   name: string;
   location: string;
+  summary: string;
   score: number;
   reason: string[];
   breakdown: RecommendationBreakdown;

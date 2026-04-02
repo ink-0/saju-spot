@@ -72,8 +72,9 @@ function scorePlace(
     id: place.id,
     name: place.name,
     location: place.location,
+    summary: place.summary,
     score,
-    reason: buildReasons(placeInfluence, breakdown, supportedMissingElements),
+    reason: buildReasons(place, placeInfluence, interpretation, breakdown, supportedMissingElements),
     breakdown,
     dominant_elements: placeInfluence.dominant_elements,
     supported_missing_elements: supportedMissingElements,
@@ -169,7 +170,9 @@ function computeUserPreference(placeInfluence: PlaceInfluenceProfile, userPrefer
 }
 
 function buildReasons(
+  place: PlaceRecord,
   placeInfluence: PlaceInfluenceProfile,
+  interpretation: InterpretationOutput,
   breakdown: RecommendationBreakdown,
   supportedMissingElements: ElementKey[],
 ): string[] {
@@ -177,9 +180,7 @@ function buildReasons(
 
   if (supportedMissingElements.length > 0) {
     const primaryElement = supportedMissingElements[0];
-    const primaryScore = placeInfluence.element_scores[primaryElement];
-    const tone = primaryScore >= 4 ? '강하게' : '어느 정도';
-    reasons.push(`부족한 ${toKoreanElement(primaryElement)} 기운을 ${tone} 채워주는 장소예요.`);
+    reasons.push(buildStoryLead(place, primaryElement, interpretation));
     reasons.push(`${getElementTraitReasons(primaryElement)[0]} 특징이 부족한 기운과 잘 맞아요.`);
   }
 
@@ -188,7 +189,10 @@ function buildReasons(
   }
 
   if (breakdown.excess_element_control >= 3.5) {
-    reasons.push('과한 기운을 더 자극하지 않아 상대적으로 편하게 머물기 좋아요.');
+    const avoidText = interpretation.conclusion.avoid.length > 0
+      ? interpretation.conclusion.avoid.map((element) => toKoreanElement(element)).join(', ')
+      : '과한 기운';
+    reasons.push(`${avoidText} 기운을 더 세게 밀어 올리지 않아서, 머물수록 흐름을 정리하기 좋아요.`);
   }
 
   if (breakdown.environment_fit >= 3.5) {
@@ -198,6 +202,19 @@ function buildReasons(
   reasons.push(`부족한 기운 보강 ${breakdown.replenishment_score.toFixed(1)}/5 · 환경 적합 ${breakdown.environment_fit.toFixed(1)}/5`);
 
   return reasons;
+}
+
+function buildStoryLead(place: PlaceRecord, primaryElement: ElementKey, interpretation: InterpretationOutput): string {
+  const lackingText = interpretation.layer_a.missing_elements.map((element) => toKoreanElement(element)).join(', ');
+  const elementStory: Record<ElementKey, string> = {
+    wood: '시작하는 힘과 의욕을 다시 세워주는',
+    fire: '열정과 존재감을 다시 데워주는',
+    earth: '마음을 가라앉히고 중심을 세워주는',
+    metal: '맺고 끊는 힘과 결단을 세워주는',
+    water: '열기를 식히고 생각을 유연하게 풀어주는',
+  };
+
+  return `지금은 ${lackingText} 기운이 부족한 편이라, ${place.name}처럼 ${elementStory[primaryElement]} 장소가 잘 맞아요.`;
 }
 
 function getSupportedMissingElements(placeInfluence: PlaceInfluenceProfile, interpretation: InterpretationOutput): ElementKey[] {

@@ -597,6 +597,7 @@ function ApiRecommendationCard({ recommendation, index }: { recommendation: Reco
       </button>
       {open && (
         <div className="px-5 pb-5 space-y-3 border-t border-white/5">
+          <p className="pt-3 text-sm text-gray-300 leading-relaxed">{recommendation.summary}</p>
           <div className="pt-3 flex flex-wrap gap-2">
             {shownElements.map((element) => {
               const ohang = toOhangType(element);
