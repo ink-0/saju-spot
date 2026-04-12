@@ -84,7 +84,7 @@ export function runEnvironmentTranslationEngine(interpretation: InterpretationOu
 
   applyElement(accumulator, interpretation.conclusion.yongshin, 1.2);
   interpretation.conclusion.heeshin.forEach((element) => applyElement(accumulator, element, 0.8));
-  interpretation.layer_a.missing_elements.forEach((element) => applyElement(accumulator, element, 0.6));
+  interpretation.layer_a.prioritized_missing.forEach((element) => applyElement(accumulator, element, 0.6));
 
   if (interpretation.layer_b.climate_condition === 'cold') {
     accumulator.brightness += 1;

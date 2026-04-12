@@ -79,6 +79,8 @@ export interface InterpretationLayerA {
   seasonal_context: SajuCoreOutput['seasonal_context'];
   dominant_elements: ElementKey[];
   missing_elements: ElementKey[];
+  /** 부족한 오행 중 사주학 우선순위 상위 2개 */
+  prioritized_missing: ElementKey[];
 }
 
 export interface InterpretationLayerB {

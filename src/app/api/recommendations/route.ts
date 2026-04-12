@@ -34,8 +34,8 @@ export async function POST(request: Request) {
     const sajuCore = runSajuCoreEngine(input);
     const interpretation = runInterpretationEngine(sajuCore);
     const environment = runEnvironmentTranslationEngine(interpretation);
-    const targetElements = interpretation.layer_a.missing_elements.length > 0
-      ? interpretation.layer_a.missing_elements
+    const targetElements = interpretation.layer_a.prioritized_missing.length > 0
+      ? interpretation.layer_a.prioritized_missing
       : [interpretation.conclusion.yongshin];
     const providerResult = await fetchProviderPlaces(input.location, targetElements);
     const providerPlaces = providerResult.places;
