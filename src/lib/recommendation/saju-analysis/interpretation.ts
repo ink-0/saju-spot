@@ -80,6 +80,14 @@ export function runInterpretationEngine(core: SajuCoreOutput): InterpretationOut
   const climateCondition = assessClimate(core);
   const conflicts = detectConflicts(core);
   const conclusion = buildConclusion(core, dayMaster, dayMasterStrength, climateCondition, missingElements, dominantElements);
+  const prioritizedMissing = prioritizeMissingElements(
+    missingElements,
+    conclusion.yongshin,
+    dominantElements,
+    dayMaster,
+    dayMasterStrength,
+    core.seasonal_context.season,
+  );
 
   return {
     layer_a: {
@@ -87,6 +95,7 @@ export function runInterpretationEngine(core: SajuCoreOutput): InterpretationOut
       seasonal_context: core.seasonal_context,
       dominant_elements: dominantElements,
       missing_elements: missingElements,
+      prioritized_missing: prioritizedMissing,
     },
     layer_b: {
       day_master: dayMaster,
@@ -311,4 +320,73 @@ function getClimateAggravator(climate: ClimateCondition): ElementKey | null {
 
 function unique<T>(items: T[]): T[] {
   return [...new Set(items)];
+}
+
+/**
+ * 부족한 오행이 여러 개일 때 사주학적 우선순위로 상위 2개를 선별합니다.
+ *
+ * 점수 기준:
+ * 1. 용신 일치 (+10) — 해당 오행이 용신 자체이면 가장 시급
+ * 2. 용신 생지 (+5) — 해당 오행이 용신을 생해주면(상생) 용신 강화
+ * 3. 과다 오행 상극 (+4) — 과다한 오행을 극하는 오행이면 균형 회복
+ * 4. 일간 보강 (+3) — 일간이 약할 때 일간을 생해주는 오행
+ * 5. 계절 보정 (+2) — 현재 계절에서 약해지는 오행이면 더 시급
+ */
+function prioritizeMissingElements(
+  missingElements: ElementKey[],
+  yongshin: ElementKey,
+  dominantElements: ElementKey[],
+  dayMaster: ElementKey,
+  dayMasterStrength: DayMasterStrength,
+  season: SajuCoreOutput['seasonal_context']['season'],
+): ElementKey[] {
+  if (missingElements.length <= 2) {
+    return missingElements;
+  }
+
+  const scored = missingElements.map((element) => {
+    let score = 0;
+
+    // 1. 용신 일치 — 가장 중요
+    if (element === yongshin) {
+      score += 10;
+    }
+
+    // 2. 해당 오행이 용신을 생해주는지 (상생 관계)
+    if (GENERATES[element] === yongshin) {
+      score += 5;
+    }
+
+    // 3. 과다한 오행을 극하는지 (상극 관계)
+    if (dominantElements.some((dominant) => CONTROLS[element] === dominant)) {
+      score += 4;
+    }
+
+    // 4. 일간이 약할 때 일간을 생해주는 오행 (인성)
+    if (dayMasterStrength === 'weak' && GENERATES[element] === dayMaster) {
+      score += 3;
+    }
+
+    // 5. 계절에서 쇠약해지는 오행이면 보강 시급성 증가
+    const seasonWeakElement = getSeasonWeakElement(season);
+    if (seasonWeakElement && element === seasonWeakElement) {
+      score += 2;
+    }
+
+    return { element, score };
+  });
+
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, 2).map((item) => item.element);
+}
+
+/** 계절별로 가장 약해지는 오행 */
+function getSeasonWeakElement(season: SajuCoreOutput['seasonal_context']['season']): ElementKey | null {
+  switch (season) {
+    case 'spring': return 'metal';  // 봄에 금 기운 약화
+    case 'summer': return 'water';  // 여름에 수 기운 약화
+    case 'autumn': return 'wood';   // 가을에 목 기운 약화
+    case 'winter': return 'fire';   // 겨울에 화 기운 약화
+    default: return null;
+  }
 }
