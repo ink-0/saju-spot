@@ -21,6 +21,8 @@ import {
   OHANG_LACKING_DESC,
   OHANG_EXCESS_DESC,
   OHANG_HANJA,
+  type OhangDesignThemeToken,
+  getPersonalizedLackingDesc,
 } from '@/lib/ohang';
 import {
   getRecommendedSpots,
@@ -36,6 +38,7 @@ import {
   getSimpleSajuSummary,
   getTwelveStateUi,
   type SajuDetailAnalysis,
+  type HighlightSection,
 } from '@/lib/saju-analysis';
 
 const RESULT_HERO_COPY: Record<OhangType, { title: string; accent: string; subtitle: string }> = {
@@ -275,7 +278,6 @@ export default function ResultPage() {
 
   const { saju, isTimeCorrected, correctedHour, correctedMinute } = result;
   const simpleSummary = getSimpleSajuSummary(detailAnalysis);
-  const summaryLines = simpleSummary.lines.filter(Boolean);
   const hasLacking = analysis.prioritizedLacking.length > 0;
   const primaryThemeOhang = analysis.prioritizedLacking[0] ?? analysis.dominant ?? '토';
   const primaryTheme = OHANG_DESIGN_THEME[primaryThemeOhang];
@@ -369,45 +371,16 @@ export default function ResultPage() {
         </div>
       </section>
 
-      <section className={`result-card rounded-3xl p-5 mb-5 ${ready ? 'fade-in-up fade-in-up-delay-1' : 'opacity-0'}`}>
-        <h2 className="text-xs font-medium result-label uppercase tracking-widest mb-3">지금 먼저 채우면 좋은 기운</h2>
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-          <div className="flex flex-wrap gap-2">
-            {(analysis.prioritizedLacking.length > 0 ? analysis.prioritizedLacking : [primaryThemeOhang]).map((ohang) => {
-              const color = OHANG_DESIGN_COLOR[ohang];
-              return (
-                <div
-                  key={`lack-summary-${ohang}`}
-                  className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 ${color.border} ${color.bg}`}
-                >
-                  <span className="text-sm">{OHANG_EMOJI[ohang]}</span>
-                  <span className={`text-sm font-semibold ${color.text}`}>{ohang}</span>
-                  <span className="text-xs result-muted">{OHANG_KEYWORDS[ohang][0]}</span>
-                </div>
-              );
-            })}
-          </div>
-          {analysis.prioritizedLacking.length > 0 ? (
-            <span className="result-pill text-xs px-3 py-1 rounded-full border" style={{ borderColor: primaryTheme.border }}>
-              우선 보강 {analysis.prioritizedLacking.length}개
-            </span>
-          ) : (
-            <span className="result-pill text-xs px-3 py-1 rounded-full border" style={{ borderColor: primaryTheme.border }}>
-              균형 상태
-            </span>
-          )}
-        </div>
-        <div className="space-y-3">
-          <p className="text-sm leading-relaxed" style={{ color: primaryTheme.text }}>
-            {summaryLines[0] ?? heroCopy.subtitle}
-          </p>
-          {summaryLines[1] && (
-            <p className="text-sm result-muted leading-relaxed">
-              {summaryLines[1]}
-            </p>
-          )}
-        </div>
-      </section>
+      <SajuSummaryCard
+        analysis={analysis}
+        primaryThemeOhang={primaryThemeOhang}
+        primaryTheme={primaryTheme}
+        heroCopy={heroCopy}
+        structuredHighlights={detailAnalysis.structuredHighlights}
+        dayMasterOhang={detailAnalysis.dayMaster.ohang}
+        iljuAdvice={detailAnalysis.iljuNarrative.advice}
+        ready={ready}
+      />
 
       {/* ── 오행 분포 ── */}
       <section className={`result-card rounded-3xl p-6 mb-5 ${ready ? 'fade-in-up fade-in-up-delay-1' : 'opacity-0'}`}>
@@ -443,22 +416,48 @@ export default function ResultPage() {
         </div>
       </section>
 
+      {/* ── 채우면 좋은 기운 (개인화) ── */}
+      {analysis.prioritizedLacking.length > 0 && (
+        <section className={`mb-5 ${ready ? 'fade-in-up fade-in-up-delay-2' : 'opacity-0'}`}>
+          <h2 className="text-xs font-medium result-label uppercase tracking-widest mb-3">채우면 좋은 기운</h2>
+          <div className="space-y-4">
+            {analysis.prioritizedLacking.map((ohang) => {
+              const lackColor = OHANG_DESIGN_COLOR[ohang];
+              const lackTheme = OHANG_DESIGN_THEME[ohang];
+              const personalDesc = getPersonalizedLackingDesc(ohang, detailAnalysis.dayMaster.ohang, analysis);
+              return (
+                <PersonalizedLackingCard
+                  key={`lacking-${ohang}`}
+                  ohang={ohang}
+                  personalDesc={personalDesc}
+                  lackColor={lackColor}
+                  lackTheme={lackTheme}
+                />
+              );
+            })}
+          </div>
+        </section>
+      )}
+
       {/* ── 과다 기운 ── */}
       {analysis.excess.length > 0 && (
         <section className={`mb-5 ${ready ? 'fade-in-up fade-in-up-delay-2' : 'opacity-0'}`}>
           <h2 className="text-xs font-medium result-label uppercase tracking-widest mb-3">과다한 기운</h2>
           <div className="space-y-3">
-            {analysis.excess.map((ohang) => (
-              <div key={ohang} className="result-card rounded-2xl p-5 border border-[#dccff2]">
-                <div className="flex items-center gap-3 mb-2">
-                  <span className="text-3xl">{OHANG_EMOJI[ohang]}</span>
-                  <p className="font-bold text-lg text-purple-300">
-                    {ohang}({OHANG_HANJA[ohang]}) 기운 과다
-                  </p>
+            {analysis.excess.map((ohang) => {
+              const excessColor = OHANG_DESIGN_COLOR[ohang];
+              return (
+                <div key={ohang} className={`result-card rounded-2xl p-5 border ${excessColor.border}`}>
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className="text-3xl">{OHANG_EMOJI[ohang]}</span>
+                    <p className={`font-bold text-lg ${excessColor.text}`}>
+                      {ohang}({OHANG_HANJA[ohang]}) 기운 과다
+                    </p>
+                  </div>
+                  <p className="result-muted text-sm leading-relaxed">{OHANG_EXCESS_DESC[ohang]}</p>
                 </div>
-                <p className="result-muted text-sm leading-relaxed">{OHANG_EXCESS_DESC[ohang]}</p>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </section>
       )}
@@ -596,16 +595,23 @@ function ApiRecommendationCard({ recommendation, index }: { recommendation: Reco
           <div className="flex items-center gap-3">
             <span className="text-sm w-5 shrink-0" style={{ color: cardTheme.muted }}>{index + 1}.</span>
             <div className="min-w-0">
-              <p className="font-semibold truncate" style={{ color: cardTheme.text }}>{recommendation.name}</p>
+              <div className="flex items-center gap-2">
+                <p className="font-semibold truncate" style={{ color: cardTheme.text }}>{recommendation.name}</p>
+                {shownElements.map((el) => {
+                  const oh = toOhangType(el);
+                  const elColor = OHANG_DESIGN_COLOR[oh];
+                  return (
+                    <span key={el} className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${elColor.bg} ${elColor.text}`}>
+                      {OHANG_EMOJI[oh]} {oh}
+                    </span>
+                  );
+                })}
+              </div>
               <p className="text-xs mt-0.5 truncate" style={{ color: cardTheme.muted }}>{recommendation.location}</p>
             </div>
           </div>
-
         </div>
-        <div className="flex items-center gap-2 shrink-0 pl-2">
-          <span className={`text-xs px-2.5 py-1 rounded-full ${dominantColor.bg} ${dominantColor.text}`}>
-            {recommendation.score.toFixed(2)}점
-          </span>
+        <div className="flex items-center shrink-0 pl-2">
           <span className="text-sm" style={{ color: cardTheme.muted }}>{open ? '▲' : '▼'}</span>
         </div>
       </button>
@@ -875,6 +881,130 @@ function SpotCard({ spot, ohang, index }: { spot: Spot; ohang: OhangType; index:
           >
             📍 네이버 지도에서 보기 →
           </a>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SajuSummaryCard({
+  analysis,
+  primaryThemeOhang,
+  primaryTheme,
+  heroCopy,
+  structuredHighlights,
+  dayMasterOhang,
+  iljuAdvice,
+  ready,
+}: {
+  analysis: OhangAnalysis;
+  primaryThemeOhang: OhangType;
+  primaryTheme: OhangDesignThemeToken;
+  heroCopy: { title: string; accent: string; subtitle: string };
+  structuredHighlights: HighlightSection[];
+  dayMasterOhang: OhangType;
+  iljuAdvice: string;
+  ready: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <section className={`result-card rounded-3xl overflow-hidden mb-5 ${ready ? 'fade-in-up fade-in-up-delay-1' : 'opacity-0'}`}>
+      <button onClick={() => setOpen(!open)} className="w-full text-left p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+          <h2 className="text-xs font-medium result-label uppercase tracking-widest">나의 사주 읽기</h2>
+          <div className="flex items-center gap-2">
+            <span className="result-pill text-xs px-3 py-1 rounded-full border" style={{ borderColor: primaryTheme.border }}>
+              {open ? '접기' : '자세히 보기'}
+            </span>
+            <span className="text-sm" style={{ color: primaryTheme.muted }}>{open ? '▲' : '▼'}</span>
+          </div>
+        </div>
+        <div className="flex items-start gap-2.5">
+          <span className="text-lg shrink-0 mt-0.5">💡</span>
+          <p className="text-sm leading-relaxed" style={{ color: primaryTheme.text }}>
+            {iljuAdvice}
+          </p>
+        </div>
+      </button>
+      {open && structuredHighlights.length > 0 && (
+        <div className="px-5 pb-6 space-y-5 border-t" style={{ borderColor: primaryTheme.border }}>
+          <h3 className="text-xs font-medium result-label uppercase tracking-widest pt-5">사주 해석</h3>
+          {structuredHighlights.map((section, i) => (
+            <div key={i} className="space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">{section.icon}</span>
+                <h4 className="text-sm font-bold" style={{ color: primaryTheme.text }}>{section.title}</h4>
+              </div>
+              <div className="text-sm leading-[1.85] result-muted pl-7">
+                {section.body}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function PersonalizedLackingCard({
+  ohang,
+  personalDesc,
+  lackColor,
+  lackTheme,
+}: {
+  ohang: OhangType;
+  personalDesc: { headline: string; detail: string; tips: string[] };
+  lackColor: { bg: string; text: string; border: string; glow: string };
+  lackTheme: OhangDesignThemeToken;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div
+      className="rounded-2xl overflow-hidden border transition-all duration-300"
+      style={{
+        background: lackTheme.surface,
+        borderColor: open ? lackTheme.accentStrong : lackTheme.border,
+        boxShadow: `0 12px 32px ${lackTheme.shadow}`,
+      }}
+    >
+      <button onClick={() => setOpen(!open)} className="w-full text-left px-5 py-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3 min-w-0">
+            <span className="text-2xl shrink-0 mt-0.5">{OHANG_EMOJI[ohang]}</span>
+            <div className="min-w-0">
+              <p className="font-bold text-base" style={{ color: lackTheme.text }}>
+                {personalDesc.headline}
+              </p>
+              <p className="text-xs mt-1" style={{ color: lackTheme.muted }}>
+                {ohang}({OHANG_HANJA[ohang]}) 기운 보충이 필요해요
+              </p>
+            </div>
+          </div>
+          <span className="text-sm shrink-0 mt-1" style={{ color: lackTheme.muted }}>{open ? '▲' : '▼'}</span>
+        </div>
+      </button>
+      {open && (
+        <div className="px-5 pb-5 space-y-4 border-t" style={{ borderColor: lackTheme.border }}>
+          <p className="text-sm leading-[1.85] pt-4" style={{ color: lackTheme.text }}>
+            {personalDesc.detail}
+          </p>
+          {personalDesc.tips.length > 0 && (
+            <div className="rounded-xl p-4" style={{ background: lackTheme.surfaceAlt }}>
+              <p className="text-xs font-medium mb-2.5" style={{ color: lackTheme.accentStrong }}>
+                💡 {ohang} 기운을 채우는 방법
+              </p>
+              <ul className="space-y-1.5">
+                {personalDesc.tips.map((tip, i) => (
+                  <li key={i} className="text-sm leading-relaxed flex items-start gap-2" style={{ color: lackTheme.text }}>
+                    <span className="shrink-0 mt-1 w-1 h-1 rounded-full" style={{ background: lackTheme.accentStrong }} />
+                    {tip}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       )}
     </div>
