@@ -34,6 +34,7 @@ import {
   analyzeSajuDetails,
   getPillarSubtitle,
   getSimpleSajuSummary,
+  getTwelveStateUi,
   type SajuDetailAnalysis,
 } from '@/lib/saju-analysis';
 
@@ -127,11 +128,11 @@ export default function ResultPage() {
       const sajuMonth = paljaResult.saju.monthPillar
         ? (['인', '묘'].includes(paljaResult.saju.monthPillar[1]) ? 1
           : ['진', '사'].includes(paljaResult.saju.monthPillar[1]) ? 3
-          : ['오', '미'].includes(paljaResult.saju.monthPillar[1]) ? 5
-          : ['신', '유'].includes(paljaResult.saju.monthPillar[1]) ? 7
-          : ['술', '해'].includes(paljaResult.saju.monthPillar[1]) ? 9
-          : ['자', '축'].includes(paljaResult.saju.monthPillar[1]) ? 11
-          : 1)
+            : ['오', '미'].includes(paljaResult.saju.monthPillar[1]) ? 5
+              : ['신', '유'].includes(paljaResult.saju.monthPillar[1]) ? 7
+                : ['술', '해'].includes(paljaResult.saju.monthPillar[1]) ? 9
+                  : ['자', '축'].includes(paljaResult.saju.monthPillar[1]) ? 11
+                    : 1)
         : 1;
       const analysisResult = prioritizeLacking(rawAnalysis, dayMasterOhang, sajuMonth);
 
@@ -333,19 +334,11 @@ export default function ResultPage() {
           <p className="mt-4 max-w-[560px] text-sm leading-6 result-muted">
             {heroCopy.subtitle}
           </p>
-          {isTimeCorrected && correctedHour !== undefined && (
-            <p className="mt-3 text-xs" style={{ color: primaryTheme.accentStrong }}>
-              진태양시 보정 적용: {correctedHour}시 {correctedMinute?.toString().padStart(2, '0')}분
-            </p>
-          )}
         </div>
       </section>
 
       {/* ── 사주팔자 카드 ── */}
-      <section className={`result-card rounded-3xl p-6 mb-5 ${ready ? 'fade-in-up' : 'opacity-0'}`}>
-        <h2 className="text-xs font-medium result-label uppercase tracking-widest mb-5">
-          사주팔자 (四柱八字)
-        </h2>
+      <section className={`result-card rounded-3xl p-4 mb-5 ${ready ? 'fade-in-up' : 'opacity-0'}`}>
         <div className="grid grid-cols-4 gap-2.5">
           {pillars.map((p) => {
             const gan = p.pillar?.[0] ?? '';
@@ -360,11 +353,6 @@ export default function ResultPage() {
             return (
               <div key={p.label} className="text-center">
                 <p className="text-xs result-label mb-2">{p.label}</p>
-                {detailPillar && (
-                  <p className="block text-[11px] result-muted leading-snug mb-2 truncate">
-                    {getPillarSubtitle(detailPillar, detailAnalysis.dayMaster)}
-                  </p>
-                )}
                 <div className="flex flex-col gap-1.5">
                   <div className={`rounded-xl py-3 ${gc.bg} ${gc.text} border ${gc.border}`}>
                     <div className="text-xl font-bold">{gan}</div>
@@ -455,41 +443,6 @@ export default function ResultPage() {
         </div>
       </section>
 
-      {/* ── 부족한 기운 (우선순위 상위 2개) ── */}
-      {analysis.prioritizedLacking.length > 0 && (
-        <section className={`mb-5 ${ready ? 'fade-in-up fade-in-up-delay-2' : 'opacity-0'}`}>
-          <h2 className="text-xs font-medium result-label uppercase tracking-widest mb-3">먼저 채우면 좋은 기운</h2>
-          <div className="space-y-3">
-            {analysis.prioritizedLacking.map((ohang, index) => {
-              const color = OHANG_DESIGN_COLOR[ohang];
-              return (
-                <div key={ohang} className={`rounded-2xl p-5 border ${color.border} ${color.bg}`}>
-                  <div className="flex items-center gap-3 mb-2">
-                    <span className="text-3xl">{OHANG_EMOJI[ohang]}</span>
-                    <div>
-                      <p className={`font-bold text-lg ${color.text}`}>
-                        {index + 1}순위 · {ohang}({OHANG_HANJA[ohang]}) 기운 부족
-                      </p>
-                      <div className="flex gap-1 flex-wrap mt-1">
-                        {OHANG_KEYWORDS[ohang].map((kw) => (
-                          <span key={kw} className={`text-xs px-2 py-0.5 rounded-full bg-white/5 ${color.text}`}>{kw}</span>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                  <p className="result-muted text-sm leading-relaxed">{OHANG_LACKING_DESC[ohang]}</p>
-                </div>
-              );
-            })}
-          </div>
-          {analysis.lacking.length > 2 && (
-            <p className="text-xs result-muted mt-3 ml-1">
-              ※ 전체 부족 오행: {analysis.lacking.map((o) => `${o}(${OHANG_HANJA[o]})`).join(', ')} — 사주 분석 결과 위 {analysis.prioritizedLacking.length}개를 우선 추천합니다.
-            </p>
-          )}
-        </section>
-      )}
-
       {/* ── 과다 기운 ── */}
       {analysis.excess.length > 0 && (
         <section className={`mb-5 ${ready ? 'fade-in-up fade-in-up-delay-2' : 'opacity-0'}`}>
@@ -521,17 +474,6 @@ export default function ResultPage() {
       {/* ── 추천 명소 ── */}
       {(apiRecommendations.length > 0 || apiRecommendationLoading || apiRecommendationError) && (
         <section className={`mb-8 ${ready ? 'fade-in-up fade-in-up-delay-3' : 'opacity-0'}`}>
-          <div className="mb-4">
-            <h2 className="text-xl font-bold" style={{ color: primaryTheme.text }}>실제 명소 추천</h2>
-            <p className="result-muted text-sm mt-1">
-              {apiRecommendationLoading
-                ? '외부 명소 데이터를 바탕으로 추천을 정리하고 있어요.'
-                : apiRecommendationSource === 'external'
-                  ? `외부 장소 데이터를 바탕으로 추천했어요 · 검색어: ${apiRecommendationQuery}`
-                  : '실시간 명소 결과가 충분하지 않아 기본 추천을 함께 보여드려요.'}
-            </p>
-          </div>
-
           {apiRecommendationLoading && (
             <div className="result-card rounded-2xl p-5 text-sm result-muted">
               실시간 명소를 불러오는 중이에요...
@@ -554,7 +496,7 @@ export default function ResultPage() {
                   <div key={`group-${group.element}`} className="space-y-3">
                     <div className="flex items-center gap-2">
                       <span className="text-lg">{OHANG_EMOJI[ohang]}</span>
-                      <h3 className={`font-semibold ${color.text}`}>부족한 {ohang} 기운 추천</h3>
+                      <h3 className={`font-semibold ${color.text}`}>부족한 {ohang} 기운 추천 장소</h3>
                     </div>
                     <div className="space-y-3">
                       {group.recommendations.map((recommendation, index) => (
@@ -656,24 +598,9 @@ function ApiRecommendationCard({ recommendation, index }: { recommendation: Reco
             <div className="min-w-0">
               <p className="font-semibold truncate" style={{ color: cardTheme.text }}>{recommendation.name}</p>
               <p className="text-xs mt-0.5 truncate" style={{ color: cardTheme.muted }}>{recommendation.location}</p>
-              {recommendation.supported_missing_elements.length > 0 && (
-                <p className={`text-xs mt-2 ${dominantColor.text}`}>
-                  부족한 {recommendation.supported_missing_elements.map((element) => toOhangType(element)).join(', ')} 기운 보강
-                </p>
-              )}
             </div>
           </div>
-          <div className="flex flex-wrap gap-2 mt-3 pl-8">
-            {placeCharacterTags.map((tag) => (
-              <span
-                key={`${recommendation.id}-${tag}`}
-                className="text-xs px-2 py-0.5 rounded-full"
-                style={{ background: cardTheme.surfaceAlt, color: cardTheme.muted }}
-              >
-                {tag}
-              </span>
-            ))}
-          </div>
+
         </div>
         <div className="flex items-center gap-2 shrink-0 pl-2">
           <span className={`text-xs px-2.5 py-1 rounded-full ${dominantColor.bg} ${dominantColor.text}`}>
@@ -684,26 +611,18 @@ function ApiRecommendationCard({ recommendation, index }: { recommendation: Reco
       </button>
       {open && (
         <div className="px-5 pb-5 space-y-3 border-t" style={{ borderColor: cardTheme.border }}>
-          <p className="pt-3 text-sm leading-relaxed" style={{ color: cardTheme.text }}>{recommendation.summary}</p>
-          <div className="pt-3 flex flex-wrap gap-2">
-            {shownElements.map((element) => {
-              const ohang = toOhangType(element);
-              return (
-                <span key={`${recommendation.id}-${element}`} className={`text-xs px-2 py-0.5 rounded-full ${OHANG_DESIGN_COLOR[ohang].bg} ${OHANG_DESIGN_COLOR[ohang].text}`}>
-                  {OHANG_EMOJI[ohang]} {ohang}
-                </span>
-              );
-            })}
+          <div className="pt-5 flex flex-wrap gap-2">
+            {placeCharacterTags.map((tag) => (
+              <span
+                key={`${recommendation.id}-${tag}`}
+                className="text-xs px-2 py-0.5 rounded-full"
+                style={{ background: cardTheme.surfaceAlt, color: cardTheme.muted }}
+              >
+                {tag}
+              </span>
+            ))}
           </div>
-          <div className="grid grid-cols-2 gap-2 text-xs" style={{ color: cardTheme.muted }}>
-            <div className="rounded-xl px-3 py-2" style={{ background: cardTheme.surfaceAlt }}>
-              부족 기운 보강 {recommendation.breakdown.replenishment_score.toFixed(1)}/5
-            </div>
-            <div className="rounded-xl px-3 py-2" style={{ background: cardTheme.surfaceAlt }}>
-              환경 적합 {recommendation.breakdown.environment_fit.toFixed(1)}/5
-            </div>
-          </div>
-          <div className="space-y-2">
+          <div className="space-y-2 pt-2">
             {recommendation.reason.map((reason) => (
               <p key={reason} className="text-sm leading-relaxed" style={{ color: cardTheme.text }}>- {reason}</p>
             ))}
