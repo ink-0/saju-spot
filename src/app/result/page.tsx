@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import {
   calcSajuPalja,
@@ -11,10 +11,12 @@ import {
 } from '@/lib/manseryeok';
 import {
   analyzeOhang,
+  prioritizeLacking,
   type OhangAnalysis,
+  OHANG_DESIGN_COLOR,
+  OHANG_DESIGN_THEME,
   OHANG_ORDER,
   OHANG_EMOJI,
-  OHANG_COLOR,
   OHANG_KEYWORDS,
   OHANG_LACKING_DESC,
   OHANG_EXCESS_DESC,
@@ -34,6 +36,34 @@ import {
   getSimpleSajuSummary,
   type SajuDetailAnalysis,
 } from '@/lib/saju-analysis';
+
+const RESULT_HERO_COPY: Record<OhangType, { title: string; accent: string; subtitle: string }> = {
+  목: {
+    title: '목 기운이 부족해요',
+    accent: '생기를 채워보세요',
+    subtitle: '나무, 바람, 확장감 있는 장소가 정체된 기운에 활력을 더해줘요.',
+  },
+  화: {
+    title: '화 기운이 부족해요',
+    accent: '온기를 채워보세요',
+    subtitle: '햇살, 활기, 밝은 에너지가 있는 장소가 가라앉은 기운을 따뜻하게 깨워줘요.',
+  },
+  토: {
+    title: '토 기운이 부족해요',
+    accent: '중심을 채워보세요',
+    subtitle: '흙길, 산책, 단단한 풍경이 있는 장소가 흐트러진 기운을 안정시켜줘요.',
+  },
+  금: {
+    title: '금 기운이 부족해요',
+    accent: '정돈을 채워보세요',
+    subtitle: '맑고 정제된 분위기의 장소가 흐릿한 기운을 또렷하게 정리해줘요.',
+  },
+  수: {
+    title: '수 기운이 부족해요',
+    accent: '흐름을 채워보세요',
+    subtitle: '넓은 시야, 물결, 바람이 있는 장소가 막힌 기운을 부드럽게 풀어줘요.',
+  },
+};
 
 export default function ResultPage() {
   const params = useSearchParams();
@@ -89,14 +119,27 @@ export default function ResultPage() {
       });
 
       const counts = countOhangFromSaju(paljaResult.saju);
-      const analysisResult = analyzeOhang(counts);
+      const rawAnalysis = analyzeOhang(counts);
       const detailResult = analyzeSajuDetails(paljaResult.saju);
+
+      // 부족한 오행 우선순위 계산 (일간 오행 + 사주월 기반)
+      const dayMasterOhang = detailResult.dayMaster.ohang;
+      const sajuMonth = paljaResult.saju.monthPillar
+        ? (['인', '묘'].includes(paljaResult.saju.monthPillar[1]) ? 1
+          : ['진', '사'].includes(paljaResult.saju.monthPillar[1]) ? 3
+          : ['오', '미'].includes(paljaResult.saju.monthPillar[1]) ? 5
+          : ['신', '유'].includes(paljaResult.saju.monthPillar[1]) ? 7
+          : ['술', '해'].includes(paljaResult.saju.monthPillar[1]) ? 9
+          : ['자', '축'].includes(paljaResult.saju.monthPillar[1]) ? 11
+          : 1)
+        : 1;
+      const analysisResult = prioritizeLacking(rawAnalysis, dayMasterOhang, sajuMonth);
 
       return {
         result: paljaResult,
         analysis: analysisResult,
         detailAnalysis: detailResult,
-        spots: getRecommendedSpots(analysisResult.lacking),
+        spots: getRecommendedSpots(analysisResult.prioritizedLacking),
         avoidSpots: getAvoidanceSpots(analysisResult.excess),
         calcError: '',
         shouldRedirect: false,
@@ -207,10 +250,10 @@ export default function ResultPage() {
   if (calcError) {
     return (
       <main className="gradient-bg min-h-screen flex items-center justify-center px-4">
-        <div className="glass rounded-2xl p-8 text-center max-w-sm">
+        <div className="result-card rounded-2xl p-8 text-center max-w-sm">
           <p className="text-2xl mb-4">⚠️</p>
-          <p className="text-red-400 mb-4">{calcError}</p>
-          <button onClick={() => router.push('/')} className="text-amber-400 underline">
+          <p className="text-[#c85b54] mb-4">{calcError}</p>
+          <button onClick={() => router.push('/')} className="text-[#8f7347] underline">
             다시 시도하기
           </button>
         </div>
@@ -223,14 +266,39 @@ export default function ResultPage() {
       <main className="gradient-bg min-h-screen flex items-center justify-center">
         <div className="text-center space-y-4">
           <div className="spinner w-12 h-12 mx-auto" />
-          <p className="text-gray-400">사주 분석 중...</p>
+          <p className="text-[#786f67]">사주 분석 중...</p>
         </div>
       </main>
     );
   }
 
-  const { saju, solarYear, solarMonth, solarDay, lunarYear, lunarMonth, lunarDay, isLeapMonth, isTimeCorrected, correctedHour, correctedMinute } = result;
+  const { saju, isTimeCorrected, correctedHour, correctedMinute } = result;
   const simpleSummary = getSimpleSajuSummary(detailAnalysis);
+  const summaryLines = simpleSummary.lines.filter(Boolean);
+  const hasLacking = analysis.prioritizedLacking.length > 0;
+  const primaryThemeOhang = analysis.prioritizedLacking[0] ?? analysis.dominant ?? '토';
+  const primaryTheme = OHANG_DESIGN_THEME[primaryThemeOhang];
+  const heroCopy = hasLacking
+    ? RESULT_HERO_COPY[primaryThemeOhang]
+    : {
+      title: '오행이 비교적 균형 잡혀 있어요',
+      accent: '지금의 균형을 이어가보세요',
+      subtitle: '전체 흐름은 안정적이에요. 지금 잘 맞는 환경을 유지하면서 필요한 기운만 가볍게 보완해보세요.',
+    };
+  const themeStyle: CSSProperties = {
+    ['--theme-page-bg' as string]: primaryTheme.pageBg,
+    ['--theme-hero-start' as string]: primaryTheme.heroStart,
+    ['--theme-orb' as string]: primaryTheme.orb,
+    ['--theme-surface' as string]: primaryTheme.surface,
+    ['--theme-surface-alt' as string]: primaryTheme.surfaceAlt,
+    ['--theme-border' as string]: primaryTheme.border,
+    ['--theme-text' as string]: primaryTheme.text,
+    ['--theme-muted' as string]: primaryTheme.muted,
+    ['--theme-accent-soft' as string]: primaryTheme.accentSoft,
+    ['--theme-accent-strong' as string]: primaryTheme.accentStrong,
+    ['--theme-pill-bg' as string]: primaryTheme.pillBg,
+    ['--theme-shadow' as string]: primaryTheme.shadow,
+  };
 
   // 사주 4기둥 파싱
   const pillars = [
@@ -241,30 +309,41 @@ export default function ResultPage() {
   ];
 
   return (
-    <main className="gradient-bg min-h-screen px-4 py-12 max-w-2xl mx-auto">
+    <main className="result-shell min-h-screen px-4 py-12 max-w-2xl mx-auto" style={themeStyle}>
       <button
         onClick={() => router.push('/')}
-        className="mb-8 text-gray-500 hover:text-white transition-colors flex items-center gap-2 text-sm"
+        className="mb-8 result-muted transition-colors flex items-center gap-2 text-sm hover:opacity-75"
       >
         ← 다시 분석하기
       </button>
 
-      {/* ── 날짜 정보 ── */}
-      <div className={`glass rounded-2xl px-5 py-4 mb-5 text-sm ${ready ? 'fade-in-up' : 'opacity-0'}`}>
-        <div className="flex flex-wrap gap-x-4 gap-y-1 text-gray-400">
-          <span>☀️ 양력 {solarYear}.{solarMonth}.{solarDay}</span>
-          <span>🌙 음력 {lunarYear}.{lunarMonth}.{lunarDay}{isLeapMonth ? ' (윤)' : ''}</span>
+      <section className={`relative mb-7 overflow-hidden ${ready ? 'fade-in-up' : 'opacity-0'}`}>
+        <ResultHeroArtwork ohang={primaryThemeOhang} />
+        <div className="relative z-10 min-h-[148px] max-w-[620px] pr-24 sm:pr-28">
+          <div className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium" style={{ background: primaryTheme.pillBg, color: primaryTheme.accentStrong }}>
+            <span>{OHANG_EMOJI[primaryThemeOhang]}</span>
+            <span>{hasLacking ? '부족한 오행' : '현재 흐름'}</span>
+          </div>
+          <h1 className="mt-4 text-[30px] font-bold tracking-[-0.04em] leading-[1.15]" style={{ color: primaryTheme.text }}>
+            {heroCopy.title}
+          </h1>
+          <p className="mt-1 text-[30px] font-bold tracking-[-0.04em] leading-[1.15]" style={{ color: primaryTheme.text }}>
+            {heroCopy.accent}
+          </p>
+          <p className="mt-4 max-w-[560px] text-sm leading-6 result-muted">
+            {heroCopy.subtitle}
+          </p>
           {isTimeCorrected && correctedHour !== undefined && (
-            <span className="text-amber-400 text-xs">
-              ⏱ 진태양시 보정 → {correctedHour}시 {correctedMinute?.toString().padStart(2, '0')}분
-            </span>
+            <p className="mt-3 text-xs" style={{ color: primaryTheme.accentStrong }}>
+              진태양시 보정 적용: {correctedHour}시 {correctedMinute?.toString().padStart(2, '0')}분
+            </p>
           )}
         </div>
-      </div>
+      </section>
 
       {/* ── 사주팔자 카드 ── */}
-      <section className={`glass rounded-3xl p-6 mb-5 ${ready ? 'fade-in-up' : 'opacity-0'}`}>
-        <h2 className="text-xs font-medium text-gray-500 uppercase tracking-widest mb-5">
+      <section className={`result-card rounded-3xl p-6 mb-5 ${ready ? 'fade-in-up' : 'opacity-0'}`}>
+        <h2 className="text-xs font-medium result-label uppercase tracking-widest mb-5">
           사주팔자 (四柱八字)
         </h2>
         <div className="grid grid-cols-4 gap-2.5">
@@ -276,13 +355,13 @@ export default function ResultPage() {
             const detailPillar = detailAnalysis.pillars.find((detail) => detail.label === p.label);
             const ganOhang: OhangType = CHUNGGAN_OHANG[gan] ?? '토';
             const jiOhang: OhangType = JIJI_OHANG[ji] ?? '토';
-            const gc = OHANG_COLOR[ganOhang];
-            const jc = OHANG_COLOR[jiOhang];
+            const gc = OHANG_DESIGN_COLOR[ganOhang];
+            const jc = OHANG_DESIGN_COLOR[jiOhang];
             return (
               <div key={p.label} className="text-center">
-                <p className="text-xs text-gray-600 mb-2">{p.label}</p>
+                <p className="text-xs result-label mb-2">{p.label}</p>
                 {detailPillar && (
-                  <p className="block text-[11px] text-gray-500 leading-snug mb-2 truncate">
+                  <p className="block text-[11px] result-muted leading-snug mb-2 truncate">
                     {getPillarSubtitle(detailPillar, detailAnalysis.dayMaster)}
                   </p>
                 )}
@@ -302,20 +381,12 @@ export default function ResultPage() {
         </div>
       </section>
 
-      {analysis.lacking.length > 0 && (
-        <section className={`glass rounded-3xl p-5 mb-5 border border-white/10 ${ready ? 'fade-in-up fade-in-up-delay-1' : 'opacity-0'}`}>
-          <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
-            <div>
-              <h2 className="text-xs font-medium text-gray-500 uppercase tracking-widest mb-2">지금 먼저 채우면 좋은 기운</h2>
-              <p className="text-sm text-gray-300 leading-relaxed">부족한 기운을 먼저 보면 지금 어떤 환경이 더 잘 맞는지 바로 읽기 쉬워져요.</p>
-            </div>
-            <span className="text-xs px-3 py-1 rounded-full border border-amber-500/20 bg-amber-500/10 text-amber-300">
-              {analysis.lacking.length}개 부족
-            </span>
-          </div>
+      <section className={`result-card rounded-3xl p-5 mb-5 ${ready ? 'fade-in-up fade-in-up-delay-1' : 'opacity-0'}`}>
+        <h2 className="text-xs font-medium result-label uppercase tracking-widest mb-3">지금 먼저 채우면 좋은 기운</h2>
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <div className="flex flex-wrap gap-2">
-            {analysis.lacking.map((ohang) => {
-              const color = OHANG_COLOR[ohang];
+            {(analysis.prioritizedLacking.length > 0 ? analysis.prioritizedLacking : [primaryThemeOhang]).map((ohang) => {
+              const color = OHANG_DESIGN_COLOR[ohang];
               return (
                 <div
                   key={`lack-summary-${ohang}`}
@@ -323,41 +394,48 @@ export default function ResultPage() {
                 >
                   <span className="text-sm">{OHANG_EMOJI[ohang]}</span>
                   <span className={`text-sm font-semibold ${color.text}`}>{ohang}</span>
-                  <span className="text-xs text-gray-300">{OHANG_KEYWORDS[ohang][0]}</span>
+                  <span className="text-xs result-muted">{OHANG_KEYWORDS[ohang][0]}</span>
                 </div>
               );
             })}
           </div>
-        </section>
-      )}
-
-      <section className={`glass rounded-3xl p-6 mb-5 ${ready ? 'fade-in-up fade-in-up-delay-1' : 'opacity-0'}`}>
-        <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
-          <div>
-            <h2 className="text-xs font-medium text-gray-500 uppercase tracking-widest mb-2">핵심 해석</h2>
-            <p className="text-base font-semibold text-white">{simpleSummary.title}</p>
-          </div>
+          {analysis.prioritizedLacking.length > 0 ? (
+            <span className="result-pill text-xs px-3 py-1 rounded-full border" style={{ borderColor: primaryTheme.border }}>
+              우선 보강 {analysis.prioritizedLacking.length}개
+            </span>
+          ) : (
+            <span className="result-pill text-xs px-3 py-1 rounded-full border" style={{ borderColor: primaryTheme.border }}>
+              균형 상태
+            </span>
+          )}
         </div>
-        <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-          <p className="text-sm text-gray-200 leading-relaxed">{simpleSummary.lines[0]}</p>
+        <div className="space-y-3">
+          <p className="text-sm leading-relaxed" style={{ color: primaryTheme.text }}>
+            {summaryLines[0] ?? heroCopy.subtitle}
+          </p>
+          {summaryLines[1] && (
+            <p className="text-sm result-muted leading-relaxed">
+              {summaryLines[1]}
+            </p>
+          )}
         </div>
       </section>
 
       {/* ── 오행 분포 ── */}
-      <section className={`glass rounded-3xl p-6 mb-5 ${ready ? 'fade-in-up fade-in-up-delay-1' : 'opacity-0'}`}>
-        <h2 className="text-xs font-medium text-gray-500 uppercase tracking-widest mb-4">오행 분포</h2>
+      <section className={`result-card rounded-3xl p-6 mb-5 ${ready ? 'fade-in-up fade-in-up-delay-1' : 'opacity-0'}`}>
+        <h2 className="text-xs font-medium result-label uppercase tracking-widest mb-4">오행 분포</h2>
         <div className="space-y-3">
           {OHANG_ORDER.map((ohang) => {
             const count = analysis.counts[ohang];
             const pct = Math.round((count / 8) * 100);
-            const color = OHANG_COLOR[ohang];
+            const color = OHANG_DESIGN_COLOR[ohang];
             return (
               <div key={ohang} className="flex items-center gap-3">
                 <span className="w-14 text-sm flex items-center gap-1">
                   <span>{OHANG_EMOJI[ohang]}</span>
                   <span className={color.text}>{ohang}</span>
                 </span>
-                <div className="flex-1 bg-white/5 rounded-full h-2.5 overflow-hidden">
+                <div className="flex-1 rounded-full h-2.5 overflow-hidden" style={{ background: primaryTheme.surfaceAlt }}>
                   <div
                     className="h-full rounded-full bar-grow"
                     style={{
@@ -367,38 +445,30 @@ export default function ResultPage() {
                     }}
                   />
                 </div>
-                <span className="w-6 text-right text-sm text-gray-400">{count}</span>
-                {count === 0 && <span className="text-xs bg-red-500/20 text-red-400 rounded-full px-2 py-0.5">없음</span>}
-                {count === 1 && <span className="text-xs bg-orange-500/20 text-orange-400 rounded-full px-2 py-0.5">약</span>}
-                {count >= 3 && <span className="text-xs bg-purple-500/20 text-purple-400 rounded-full px-2 py-0.5">과다</span>}
+                <span className="w-6 text-right text-sm result-muted">{count}</span>
+                {count === 0 && <span className="text-xs bg-[#fff0ee] text-[#c85b54] rounded-full px-2 py-0.5">없음</span>}
+                {count === 1 && <span className="text-xs bg-[#fff4e6] text-[#bd7b34] rounded-full px-2 py-0.5">약</span>}
+                {count >= 3 && <span className="text-xs bg-[#f2eef8] text-[#7b69aa] rounded-full px-2 py-0.5">과다</span>}
               </div>
             );
           })}
         </div>
       </section>
 
-      <section className={`glass rounded-3xl p-6 mb-5 ${ready ? 'fade-in-up fade-in-up-delay-2' : 'opacity-0'}`}>
-        <h2 className="text-xs font-medium text-gray-500 uppercase tracking-widest mb-4">성향 요약</h2>
-        <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4 space-y-2">
-          <p className="text-sm text-gray-200 leading-relaxed">{simpleSummary.lines[0]}</p>
-          <p className="text-sm text-gray-300 leading-relaxed">{simpleSummary.lines[1]}</p>
-        </div>
-      </section>
-
-      {/* ── 부족한 기운 ── */}
-      {analysis.lacking.length > 0 && (
+      {/* ── 부족한 기운 (우선순위 상위 2개) ── */}
+      {analysis.prioritizedLacking.length > 0 && (
         <section className={`mb-5 ${ready ? 'fade-in-up fade-in-up-delay-2' : 'opacity-0'}`}>
-          <h2 className="text-xs font-medium text-gray-500 uppercase tracking-widest mb-3">부족한 기운</h2>
+          <h2 className="text-xs font-medium result-label uppercase tracking-widest mb-3">먼저 채우면 좋은 기운</h2>
           <div className="space-y-3">
-            {analysis.lacking.map((ohang) => {
-              const color = OHANG_COLOR[ohang];
+            {analysis.prioritizedLacking.map((ohang, index) => {
+              const color = OHANG_DESIGN_COLOR[ohang];
               return (
                 <div key={ohang} className={`rounded-2xl p-5 border ${color.border} ${color.bg}`}>
                   <div className="flex items-center gap-3 mb-2">
                     <span className="text-3xl">{OHANG_EMOJI[ohang]}</span>
                     <div>
                       <p className={`font-bold text-lg ${color.text}`}>
-                        {ohang}({OHANG_HANJA[ohang]}) 기운 부족
+                        {index + 1}순위 · {ohang}({OHANG_HANJA[ohang]}) 기운 부족
                       </p>
                       <div className="flex gap-1 flex-wrap mt-1">
                         {OHANG_KEYWORDS[ohang].map((kw) => (
@@ -407,39 +477,44 @@ export default function ResultPage() {
                       </div>
                     </div>
                   </div>
-                  <p className="text-gray-300 text-sm leading-relaxed">{OHANG_LACKING_DESC[ohang]}</p>
+                  <p className="result-muted text-sm leading-relaxed">{OHANG_LACKING_DESC[ohang]}</p>
                 </div>
               );
             })}
           </div>
+          {analysis.lacking.length > 2 && (
+            <p className="text-xs result-muted mt-3 ml-1">
+              ※ 전체 부족 오행: {analysis.lacking.map((o) => `${o}(${OHANG_HANJA[o]})`).join(', ')} — 사주 분석 결과 위 {analysis.prioritizedLacking.length}개를 우선 추천합니다.
+            </p>
+          )}
         </section>
       )}
 
       {/* ── 과다 기운 ── */}
       {analysis.excess.length > 0 && (
         <section className={`mb-5 ${ready ? 'fade-in-up fade-in-up-delay-2' : 'opacity-0'}`}>
-          <h2 className="text-xs font-medium text-gray-500 uppercase tracking-widest mb-3">과다한 기운</h2>
+          <h2 className="text-xs font-medium result-label uppercase tracking-widest mb-3">과다한 기운</h2>
           <div className="space-y-3">
             {analysis.excess.map((ohang) => (
-              <div key={ohang} className="glass rounded-2xl p-5 border border-purple-500/30">
+              <div key={ohang} className="result-card rounded-2xl p-5 border border-[#dccff2]">
                 <div className="flex items-center gap-3 mb-2">
                   <span className="text-3xl">{OHANG_EMOJI[ohang]}</span>
                   <p className="font-bold text-lg text-purple-300">
                     {ohang}({OHANG_HANJA[ohang]}) 기운 과다
                   </p>
                 </div>
-                <p className="text-gray-300 text-sm leading-relaxed">{OHANG_EXCESS_DESC[ohang]}</p>
+                <p className="result-muted text-sm leading-relaxed">{OHANG_EXCESS_DESC[ohang]}</p>
               </div>
             ))}
           </div>
         </section>
       )}
 
-      {analysis.lacking.length === 0 && analysis.excess.length === 0 && (
-        <section className={`glass rounded-2xl p-6 mb-5 text-center ${ready ? 'fade-in-up fade-in-up-delay-2' : 'opacity-0'}`}>
+      {analysis.prioritizedLacking.length === 0 && analysis.excess.length === 0 && (
+        <section className={`result-card rounded-2xl p-6 mb-5 text-center ${ready ? 'fade-in-up fade-in-up-delay-2' : 'opacity-0'}`}>
           <p className="text-3xl mb-2">⚖️</p>
-          <p className="text-white font-bold">오행이 비교적 균형 잡혀 있어요!</p>
-          <p className="text-gray-400 text-sm mt-1">아래 명소들을 통해 각 기운을 더욱 강화해보세요.</p>
+          <p className="font-bold" style={{ color: primaryTheme.text }}>오행이 비교적 균형 잡혀 있어요!</p>
+          <p className="result-muted text-sm mt-1">아래 명소들을 통해 각 기운을 더욱 강화해보세요.</p>
         </section>
       )}
 
@@ -447,8 +522,8 @@ export default function ResultPage() {
       {(apiRecommendations.length > 0 || apiRecommendationLoading || apiRecommendationError) && (
         <section className={`mb-8 ${ready ? 'fade-in-up fade-in-up-delay-3' : 'opacity-0'}`}>
           <div className="mb-4">
-            <h2 className="text-xl font-bold text-white">실제 명소 추천</h2>
-            <p className="text-gray-400 text-sm mt-1">
+            <h2 className="text-xl font-bold" style={{ color: primaryTheme.text }}>실제 명소 추천</h2>
+            <p className="result-muted text-sm mt-1">
               {apiRecommendationLoading
                 ? '외부 명소 데이터를 바탕으로 추천을 정리하고 있어요.'
                 : apiRecommendationSource === 'external'
@@ -458,13 +533,13 @@ export default function ResultPage() {
           </div>
 
           {apiRecommendationLoading && (
-            <div className="glass rounded-2xl p-5 border border-white/10 text-sm text-gray-300">
+            <div className="result-card rounded-2xl p-5 text-sm result-muted">
               실시간 명소를 불러오는 중이에요...
             </div>
           )}
 
           {apiRecommendationError && (
-            <div className="glass rounded-2xl p-5 border border-red-500/20 text-sm text-red-300">
+            <div className="result-card rounded-2xl p-5 border border-[#f2d0ca] text-sm text-[#c85b54]">
               {apiRecommendationError}
             </div>
           )}
@@ -473,7 +548,7 @@ export default function ResultPage() {
             <div className="space-y-6">
               {apiGroupedRecommendations.map((group) => {
                 const ohang = toOhangType(group.element);
-                const color = OHANG_COLOR[ohang];
+                const color = OHANG_DESIGN_COLOR[ohang];
 
                 return (
                   <div key={`group-${group.element}`} className="space-y-3">
@@ -507,17 +582,17 @@ export default function ResultPage() {
       {apiRecommendations.length === 0 && spots.map((ohangSpots, si) => (
         <section key={ohangSpots.ohang} className={`mb-8 ${ready ? `fade-in-up fade-in-up-delay-${Math.min(si + 3, 5)}` : 'opacity-0'}`}>
           <div className="mb-4">
-            <h2 className={`text-xl font-bold ${OHANG_COLOR[ohangSpots.ohang].text}`}>
+            <h2 className={`text-xl font-bold ${OHANG_DESIGN_COLOR[ohangSpots.ohang].text}`}>
               {OHANG_EMOJI[ohangSpots.ohang]} {ohangSpots.title}
             </h2>
-            <p className="text-gray-400 text-sm mt-1">{ohangSpots.subtitle}</p>
+            <p className="result-muted text-sm mt-1">{ohangSpots.subtitle}</p>
           </div>
-          <div className="glass rounded-2xl p-5 mb-4 border border-white/10">
-            <p className="text-sm text-gray-200 leading-relaxed">💬 {ohangSpots.advice}</p>
+          <div className="result-card rounded-2xl p-5 mb-4">
+            <p className="text-sm leading-relaxed" style={{ color: primaryTheme.text }}>💬 {ohangSpots.advice}</p>
           </div>
           {ohangSpots.warning && (
-            <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-4 mb-4">
-              <p className="text-red-300 text-sm">⚠️ {ohangSpots.warning}</p>
+            <div className="bg-[#fff2ef] border border-[#f2d5cf] rounded-2xl p-4 mb-4">
+              <p className="text-[#c85b54] text-sm">⚠️ {ohangSpots.warning}</p>
             </div>
           )}
           <div className="space-y-3">
@@ -535,7 +610,7 @@ export default function ResultPage() {
             <h2 className="text-xl font-bold text-purple-300">
               ❄️ {ohangSpots.ohang}({OHANG_HANJA[ohangSpots.ohang]}) 과다 — 냉각 명소
             </h2>
-            <p className="text-gray-400 text-sm mt-1">기운을 식혀줄 장소들이에요</p>
+            <p className="result-muted text-sm mt-1">기운을 식혀줄 장소들이에요</p>
           </div>
           <div className="space-y-3">
             {(ohangSpots.avoidSpots || []).map((spot, i) => (
@@ -545,9 +620,9 @@ export default function ResultPage() {
         </section>
       ))}
 
-      <footer className="pt-8 border-t border-white/5 text-center text-xs text-gray-600 space-y-1">
+      <footer className="pt-8 border-t text-center text-xs space-y-1" style={{ borderColor: primaryTheme.border, color: primaryTheme.muted }}>
         <p>풍수지리·음양오행 전통 이론 기반 참고용 콘텐츠입니다</p>
-        <a href="/privacy" className="underline hover:text-gray-400 transition-colors">개인정보처리방침</a>
+        <a href="/privacy" className="underline transition-opacity hover:opacity-70">개인정보처리방침</a>
       </footer>
     </main>
   );
@@ -556,7 +631,8 @@ export default function ResultPage() {
 function ApiRecommendationCard({ recommendation, index }: { recommendation: RecommendationResult; index: number }) {
   const [open, setOpen] = useState(false);
   const dominantElement = recommendation.supported_missing_elements[0] ?? recommendation.dominant_elements[0] ?? recommendation.tags.element[0] ?? 'earth';
-  const dominantColor = OHANG_COLOR[toOhangType(dominantElement)];
+  const dominantColor = OHANG_DESIGN_COLOR[toOhangType(dominantElement)];
+  const cardTheme = OHANG_DESIGN_THEME[toOhangType(dominantElement)];
   const shownElements = recommendation.supported_missing_elements.length > 0
     ? recommendation.supported_missing_elements
     : recommendation.dominant_elements.length > 0
@@ -565,14 +641,21 @@ function ApiRecommendationCard({ recommendation, index }: { recommendation: Reco
   const placeCharacterTags = getPlaceCharacterTags(recommendation);
 
   return (
-    <div className={`glass rounded-2xl overflow-hidden border transition-all duration-300 ${open ? dominantColor.border : 'border-white/8'}`}>
+    <div
+      className="rounded-2xl overflow-hidden border transition-all duration-300"
+      style={{
+        background: cardTheme.surface,
+        borderColor: open ? cardTheme.accentStrong : cardTheme.border,
+        boxShadow: `0 20px 40px ${cardTheme.shadow}`,
+      }}
+    >
       <button onClick={() => setOpen(!open)} className="w-full text-left px-5 py-4 flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-3">
-            <span className="text-gray-500 text-sm w-5 shrink-0">{index + 1}.</span>
+            <span className="text-sm w-5 shrink-0" style={{ color: cardTheme.muted }}>{index + 1}.</span>
             <div className="min-w-0">
-              <p className="font-semibold text-white truncate">{recommendation.name}</p>
-              <p className="text-xs text-gray-500 mt-0.5 truncate">{recommendation.location}</p>
+              <p className="font-semibold truncate" style={{ color: cardTheme.text }}>{recommendation.name}</p>
+              <p className="text-xs mt-0.5 truncate" style={{ color: cardTheme.muted }}>{recommendation.location}</p>
               {recommendation.supported_missing_elements.length > 0 && (
                 <p className={`text-xs mt-2 ${dominantColor.text}`}>
                   부족한 {recommendation.supported_missing_elements.map((element) => toOhangType(element)).join(', ')} 기운 보강
@@ -582,7 +665,11 @@ function ApiRecommendationCard({ recommendation, index }: { recommendation: Reco
           </div>
           <div className="flex flex-wrap gap-2 mt-3 pl-8">
             {placeCharacterTags.map((tag) => (
-              <span key={`${recommendation.id}-${tag}`} className="text-xs bg-white/5 text-gray-400 px-2 py-0.5 rounded-full">
+              <span
+                key={`${recommendation.id}-${tag}`}
+                className="text-xs px-2 py-0.5 rounded-full"
+                style={{ background: cardTheme.surfaceAlt, color: cardTheme.muted }}
+              >
                 {tag}
               </span>
             ))}
@@ -592,29 +679,33 @@ function ApiRecommendationCard({ recommendation, index }: { recommendation: Reco
           <span className={`text-xs px-2.5 py-1 rounded-full ${dominantColor.bg} ${dominantColor.text}`}>
             {recommendation.score.toFixed(2)}점
           </span>
-          <span className="text-gray-500 text-sm">{open ? '▲' : '▼'}</span>
+          <span className="text-sm" style={{ color: cardTheme.muted }}>{open ? '▲' : '▼'}</span>
         </div>
       </button>
       {open && (
-        <div className="px-5 pb-5 space-y-3 border-t border-white/5">
-          <p className="pt-3 text-sm text-gray-300 leading-relaxed">{recommendation.summary}</p>
+        <div className="px-5 pb-5 space-y-3 border-t" style={{ borderColor: cardTheme.border }}>
+          <p className="pt-3 text-sm leading-relaxed" style={{ color: cardTheme.text }}>{recommendation.summary}</p>
           <div className="pt-3 flex flex-wrap gap-2">
             {shownElements.map((element) => {
               const ohang = toOhangType(element);
               return (
-                <span key={`${recommendation.id}-${element}`} className={`text-xs px-2 py-0.5 rounded-full ${OHANG_COLOR[ohang].bg} ${OHANG_COLOR[ohang].text}`}>
+                <span key={`${recommendation.id}-${element}`} className={`text-xs px-2 py-0.5 rounded-full ${OHANG_DESIGN_COLOR[ohang].bg} ${OHANG_DESIGN_COLOR[ohang].text}`}>
                   {OHANG_EMOJI[ohang]} {ohang}
                 </span>
               );
             })}
           </div>
-          <div className="grid grid-cols-2 gap-2 text-xs text-gray-400">
-            <div className="rounded-xl bg-white/5 px-3 py-2">부족 기운 보강 {recommendation.breakdown.replenishment_score.toFixed(1)}/5</div>
-            <div className="rounded-xl bg-white/5 px-3 py-2">환경 적합 {recommendation.breakdown.environment_fit.toFixed(1)}/5</div>
+          <div className="grid grid-cols-2 gap-2 text-xs" style={{ color: cardTheme.muted }}>
+            <div className="rounded-xl px-3 py-2" style={{ background: cardTheme.surfaceAlt }}>
+              부족 기운 보강 {recommendation.breakdown.replenishment_score.toFixed(1)}/5
+            </div>
+            <div className="rounded-xl px-3 py-2" style={{ background: cardTheme.surfaceAlt }}>
+              환경 적합 {recommendation.breakdown.environment_fit.toFixed(1)}/5
+            </div>
           </div>
           <div className="space-y-2">
             {recommendation.reason.map((reason) => (
-              <p key={reason} className="text-sm text-gray-300 leading-relaxed">- {reason}</p>
+              <p key={reason} className="text-sm leading-relaxed" style={{ color: cardTheme.text }}>- {reason}</p>
             ))}
           </div>
         </div>
@@ -667,43 +758,194 @@ function toOhangType(element: string): OhangType {
   return mapping[element] ?? '토';
 }
 
+function FireArtwork() {
+  return (
+    <>
+      <defs>
+        <radialGradient id="fire-orb-shadow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(102 98) rotate(90) scale(86 96)">
+          <stop offset="0" stopColor="#FFB38F" stopOpacity="0.42" />
+          <stop offset="0.62" stopColor="#FFC9B4" stopOpacity="0.2" />
+          <stop offset="1" stopColor="#FFF8F5" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+      <ellipse cx="102" cy="98" rx="96" ry="86" fill="url(#fire-orb-shadow)" />
+      <circle cx="90" cy="84" r="78" fill="#FFCCBC" />
+      <circle cx="54" cy="66" r="28" fill="#FFF3B8" />
+    </>
+  );
+}
+
+function WaterArtwork() {
+  return (
+    <>
+      <defs>
+        <linearGradient id="water-wave-back" x1="84" y1="88" x2="84" y2="170" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#CFE8F8" />
+          <stop offset="1" stopColor="#A8D4F0" />
+        </linearGradient>
+        <linearGradient id="water-wave-mid" x1="84" y1="112" x2="84" y2="170" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#9BCAE9" />
+          <stop offset="1" stopColor="#74B3DE" />
+        </linearGradient>
+        <linearGradient id="water-wave-front" x1="84" y1="132" x2="84" y2="170" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#73B3DE" />
+          <stop offset="1" stopColor="#4E9ED3" />
+        </linearGradient>
+      </defs>
+      <path
+        d="M-8 76C15 79 31 63 53 63C75 63 90 80 112 80C134 80 152 67 178 60"
+        stroke="#B7DCF2"
+        strokeWidth="5"
+        strokeLinecap="round"
+      />
+      <path
+        d="M-10 110C11 104 26 90 48 90C69 90 84 106 105 106C125 106 139 94 159 94C166 94 172 96 178 99V170H-10V110Z"
+        fill="url(#water-wave-back)"
+      />
+      <path
+        d="M-10 132C12 126 28 116 50 116C72 116 86 129 108 129C129 129 143 119 163 119C168 119 173 120 178 122V170H-10V132Z"
+        fill="url(#water-wave-mid)"
+      />
+      <path
+        d="M-10 150C12 145 28 138 50 138C72 138 87 148 109 148C130 148 144 141 164 141C169 141 174 142 178 144V170H-10V150Z"
+        fill="url(#water-wave-front)"
+      />
+    </>
+  );
+}
+
+function WoodArtwork() {
+  return (
+    <>
+      <circle cx="130" cy="20" r="130" fill="#E3F0DE" />
+      <polygon points="52,155 97,38 140,155" fill="#5E8A57" />
+      <polygon points="17,155 62,62 105,155" fill="#7BA46F" />
+      <rect x="57" y="121" width="11" height="34" fill="#94734D" />
+    </>
+  );
+}
+
+function EarthArtwork() {
+  return (
+    <>
+      <defs>
+        <linearGradient id="earth-dune-back" x1="85" y1="82" x2="85" y2="170" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#E8D3A7" />
+          <stop offset="1" stopColor="#D9BD87" />
+        </linearGradient>
+        <linearGradient id="earth-dune-front" x1="85" y1="114" x2="85" y2="170" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#CDA774" />
+          <stop offset="1" stopColor="#B88C57" />
+        </linearGradient>
+      </defs>
+      <circle cx="140" cy="25" r="130" fill="#FFF0C8" />
+      <path
+        d="M-8 116C18 102 38 106 58 95C79 82 99 79 118 86C138 94 153 108 178 104V170H-8V116Z"
+        fill="url(#earth-dune-back)"
+      />
+      <path
+        d="M-10 140C16 130 42 129 63 121C86 112 108 111 126 118C146 125 159 139 178 136V170H-10V140Z"
+        fill="url(#earth-dune-front)"
+      />
+    </>
+  );
+}
+
+function MetalArtwork() {
+  return (
+    <>
+      <defs>
+        <radialGradient id="metal-orb" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(120 32) rotate(90) scale(118)">
+          <stop offset="0" stopColor="#F4F7FA" />
+          <stop offset="1" stopColor="#E8EDF3" />
+        </radialGradient>
+      </defs>
+      <circle cx="120" cy="32" r="118" fill="url(#metal-orb)" />
+      <ellipse cx="92" cy="154" rx="48" ry="8" fill="#DDE3EA" fillOpacity="0.72" />
+
+      <polygon points="74,38 103,24 128,40 110,57 84,58" fill="#F8FAFC" />
+      <polygon points="58,53 84,58 75,88 46,76" fill="#DCE3EA" />
+      <polygon points="39,78 75,88 74,126 45,113 31,92" fill="#E8EDF2" />
+      <polygon points="84,58 110,57 111,92 87,106 75,88" fill="#D4DCE4" />
+      <polygon points="110,57 128,40 146,66 126,85 111,92" fill="#C7D0D9" />
+      <polygon points="126,85 146,66 139,111 119,128 111,92" fill="#D9E0E7" />
+      <polygon points="62,101 75,88 87,106 75,126 58,118" fill="#BCC6D0" />
+      <polygon points="74,126 87,106 111,92 119,128 94,153" fill="#E4EAF1" />
+      <polygon points="88,79 104,94 95,122 76,108 79,91" fill="#F7FAFC" />
+    </>
+  );
+}
+
+function ResultHeroArtwork({ ohang }: { ohang: OhangType }) {
+  return (
+    <svg
+      className="pointer-events-none absolute right-0 top-0"
+      width="170"
+      height="170"
+      viewBox="0 0 170 170"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      {ohang === '화' && <FireArtwork />}
+      {ohang === '수' && <WaterArtwork />}
+      {ohang === '목' && <WoodArtwork />}
+      {ohang === '토' && <EarthArtwork />}
+      {ohang === '금' && <MetalArtwork />}
+    </svg>
+  );
+}
+
 function SpotCard({ spot, ohang, index }: { spot: Spot; ohang: OhangType; index: number }) {
   const [open, setOpen] = useState(false);
-  const color = OHANG_COLOR[ohang];
+  const color = OHANG_DESIGN_COLOR[ohang];
+  const cardTheme = OHANG_DESIGN_THEME[ohang];
   return (
-    <div className={`glass rounded-2xl overflow-hidden border transition-all duration-300 ${open ? color.border : 'border-white/8'}`}>
+    <div
+      className="rounded-2xl overflow-hidden border transition-all duration-300"
+      style={{
+        background: cardTheme.surface,
+        borderColor: open ? cardTheme.accentStrong : cardTheme.border,
+        boxShadow: `0 20px 40px ${cardTheme.shadow}`,
+      }}
+    >
       <button onClick={() => setOpen(!open)} className="w-full text-left px-5 py-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <span className="text-gray-500 text-sm w-5">{index + 1}.</span>
+          <span className="text-sm w-5" style={{ color: cardTheme.muted }}>{index + 1}.</span>
           <div>
-            <p className="font-semibold text-white">{spot.name}</p>
-            <p className="text-xs text-gray-500 mt-0.5">{spot.address}</p>
+            <p className="font-semibold" style={{ color: cardTheme.text }}>{spot.name}</p>
+            <p className="text-xs mt-0.5" style={{ color: cardTheme.muted }}>{spot.address}</p>
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <span className={`text-xs px-2 py-0.5 rounded-full ${color.bg} ${color.text}`}>{spot.category}</span>
-          <span className="text-gray-500 text-sm">{open ? '▲' : '▼'}</span>
+          <span className="text-sm" style={{ color: cardTheme.muted }}>{open ? '▲' : '▼'}</span>
         </div>
       </button>
       {open && (
-        <div className="px-5 pb-5 space-y-3 border-t border-white/5">
+        <div className="px-5 pb-5 space-y-3 border-t" style={{ borderColor: cardTheme.border }}>
           <div className="pt-3">
-            <p className="text-xs text-gray-500 mb-1">🧭 풍수 포인트</p>
-            <p className="text-sm text-gray-300 leading-relaxed">{spot.fengshui}</p>
+            <p className="text-xs mb-1" style={{ color: cardTheme.muted }}>🧭 풍수 포인트</p>
+            <p className="text-sm leading-relaxed" style={{ color: cardTheme.text }}>{spot.fengshui}</p>
           </div>
           <div>
-            <p className="text-xs text-gray-500 mb-1">💡 방문 팁</p>
-            <p className="text-sm text-amber-300 leading-relaxed">{spot.tip}</p>
+            <p className="text-xs mb-1" style={{ color: cardTheme.muted }}>💡 방문 팁</p>
+            <p className="text-sm leading-relaxed" style={{ color: cardTheme.accentStrong }}>{spot.tip}</p>
           </div>
           {spot.warning && (
             <div>
-              <p className="text-xs text-gray-500 mb-1">⚠️ 주의</p>
-              <p className="text-sm text-orange-300 leading-relaxed">{spot.warning}</p>
+              <p className="text-xs mb-1" style={{ color: cardTheme.muted }}>⚠️ 주의</p>
+              <p className="text-sm leading-relaxed" style={{ color: '#c85b54' }}>{spot.warning}</p>
             </div>
           )}
           <div className="flex gap-1 flex-wrap">
             {spot.tags.map((tag) => (
-              <span key={tag} className="text-xs bg-white/5 text-gray-500 px-2 py-0.5 rounded-full">#{tag}</span>
+              <span
+                key={tag}
+                className="text-xs px-2 py-0.5 rounded-full"
+                style={{ background: cardTheme.surfaceAlt, color: cardTheme.muted }}
+              >
+                #{tag}
+              </span>
             ))}
           </div>
           <a
