@@ -275,3 +275,115 @@ export const OHANG_EXCESS_DESC: Record<OhangType, string> = {
   금: '지나치게 냉정하고 날카로워요. 완벽주의로 자신도 타인도 힘들게 할 수 있어요.',
   수: '생각이 너무 많아서 행동으로 옮기지 못해요. 불안감이 높고 의심이 많아질 수 있어요.',
 };
+
+/* ─────────── 개인화된 부족 오행 설명 ─────────── */
+
+/** 오행 상생 관계 표 (A → B를 생함) */
+const OHANG_GENERATES_MAP: Record<OhangType, OhangType> = {
+  목: '화', 화: '토', 토: '금', 금: '수', 수: '목',
+};
+
+/** 오행 상극 관계 표 (A → B를 극함) */
+const OHANG_CONTROLS_MAP: Record<OhangType, OhangType> = {
+  목: '토', 화: '금', 토: '수', 금: '목', 수: '화',
+};
+
+const OHANG_NATURE_NAME: Record<OhangType, string> = {
+  목: '나무', 화: '불', 토: '흙', 금: '쇠', 수: '물',
+};
+
+const OHANG_ENERGY_NAME: Record<OhangType, string> = {
+  목: '성장과 시작의 기운', 화: '열정과 표현의 기운',
+  토: '안정과 중심의 기운', 금: '결단과 마무리의 기운',
+  수: '지혜와 유연함의 기운',
+};
+
+const OHANG_ACTION_TIPS: Record<OhangType, string[]> = {
+  목: ['녹색 계열 소품이나 의류를 가까이 해보세요', '산책이나 공원 방문으로 자연의 기운을 받아보세요', '새로운 배움이나 도전을 일상에 하나 추가해 보세요'],
+  화: ['햇볕을 충분히 쬐는 시간을 만들어 보세요', '붉은 계열 소품을 포인트로 활용해 보세요', '활기찬 운동이나 사람들과의 모임으로 에너지를 충전해 보세요'],
+  토: ['흙길 산책이나 세라믹 공예 등 흙과 관련된 활동을 해보세요', '노란색이나 갈색 톤의 안정적인 색상을 가까이 해보세요', '규칙적인 루틴을 만들어 일상의 리듬을 잡아보세요'],
+  금: ['금속 소재의 액세서리를 포인트로 착용해 보세요', '흰색·실버 톤으로 공간을 정리해 보세요', '마감 기한을 정해두고 작은 일부터 완결해 보세요'],
+  수: ['물가 산책이나 수영 등 물과 가까운 활동을 해보세요', '검정이나 남색 계열로 차분한 분위기를 만들어 보세요', '명상이나 일기 쓰기로 내면의 흐름을 정리해 보세요'],
+};
+
+/**
+ * 개인화된 부족 오행 설명을 생성합니다.
+ *
+ * 일간 오행과의 상생/상극 관계, 과다 오행과의 밸런스를 반영하여
+ * "이 사람의 사주에서 왜 이 오행이 특히 중요한지"를 설명합니다.
+ */
+export function getPersonalizedLackingDesc(
+  ohang: OhangType,
+  dayMasterOhang: OhangType,
+  analysis: OhangAnalysis,
+): { headline: string; detail: string; tips: string[] } {
+  const lines: string[] = [];
+  let headline: string;
+
+  // 1. 부족 오행 → 일간과의 관계 해석
+  const generatesTarget = OHANG_GENERATES_MAP[ohang];
+  const controlsTarget = OHANG_CONTROLS_MAP[ohang];
+  const generatedBy = (Object.entries(OHANG_GENERATES_MAP) as [OhangType, OhangType][]).find(([, v]) => v === ohang)?.[0];
+
+  if (OHANG_GENERATES_MAP[ohang] === dayMasterOhang) {
+    // 부족 오행이 일간을 생해주는 관계 (인성 역할)
+    headline = `나를 키워주는 ${OHANG_ENERGY_NAME[ohang]}이 부족해요`;
+    lines.push(
+      `${OHANG_NATURE_NAME[ohang]}(${OHANG_HANJA[ohang]})은 ${OHANG_NATURE_NAME[dayMasterOhang]}(${OHANG_HANJA[dayMasterOhang]})을 키워주는 기운이에요. 이 기운이 약하면 스스로를 충전하고 회복하는 힘이 부족해질 수 있어요.`,
+      `마치 뿌리에 영양을 주는 토양이 메마른 것처럼, 바깥에서 열심히 해도 안에서 차오르는 에너지가 느껴지지 않을 때가 있어요.`,
+    );
+  } else if (dayMasterOhang === ohang) {
+    // 부족 오행이 일간과 같은 오행 (비겁 역할)
+    headline = `나와 같은 ${OHANG_ENERGY_NAME[ohang]}이 부족해요`;
+    lines.push(
+      `자신과 같은 ${ohang}(${OHANG_HANJA[ohang]}) 기운이 부족하면, 스스로 밀고 나가는 추진력이나 자존감이 약해지기 쉬워요.`,
+      `혼자서는 버거움을 느끼고, 누군가의 도움이나 환경의 뒷받침이 있어야 비로소 안정감을 찾을 수 있는 구조예요.`,
+    );
+  } else if (OHANG_GENERATES_MAP[dayMasterOhang] === ohang) {
+    // 일간이 부족 오행을 생해주는 관계 (식상 역할)
+    headline = `표현의 출구인 ${OHANG_ENERGY_NAME[ohang]}이 부족해요`;
+    lines.push(
+      `${dayMasterOhang}(${OHANG_HANJA[dayMasterOhang]}) 일간이 만들어내는 에너지가 ${ohang}(${OHANG_HANJA[ohang]}) 쪽으로 흘러야 하는데, 그 출구가 좁아진 상태예요.`,
+      `생각은 많지만 표현이 막히거나, 하고 싶은 일은 있는데 실행으로 이어지기 어려운 답답함을 느끼기 쉬워요.`,
+    );
+  } else if (OHANG_CONTROLS_MAP[dayMasterOhang] === ohang) {
+    // 일간이 부족 오행을 극하는 관계 (재성 역할)
+    headline = `현실 감각의 ${OHANG_ENERGY_NAME[ohang]}이 부족해요`;
+    lines.push(
+      `${dayMasterOhang}(${OHANG_HANJA[dayMasterOhang]}) 일간이 다스려야 할 ${ohang}(${OHANG_HANJA[ohang]}) 기운이 약하면, 현실을 관리하고 자원을 챙기는 감각이 흐릿해질 수 있어요.`,
+      `계획은 세웠는데 실속이 따르지 않거나, 돈·시간 같은 실질적 자원 관리에서 아쉬움이 남는 경우가 생기기 쉬워요.`,
+    );
+  } else {
+    // 부족 오행이 일간을 극하는 관계 (관성 역할)
+    headline = `자기 절제의 ${OHANG_ENERGY_NAME[ohang]}이 부족해요`;
+    lines.push(
+      `${ohang}(${OHANG_HANJA[ohang]}) 기운은 ${dayMasterOhang}(${OHANG_HANJA[dayMasterOhang]}) 일간을 눌러주는 역할이에요. 이 기운이 약하면 자기 조절이 어렵거나 외부의 규율 없이 흐트러지기 쉬워요.`,
+      `자유로운 것은 좋지만, 가끔은 스스로를 잡아줄 프레임이 필요한 타입이에요.`,
+    );
+  }
+
+  // 2. 과다 오행과의 밸런스 관점
+  if (analysis.excess.length > 0) {
+    const excessNames = analysis.excess.map((e) => `${e}(${OHANG_HANJA[e]})`).join(', ');
+    const controlsExcess = analysis.excess.some((e) => OHANG_CONTROLS_MAP[ohang] === e);
+    if (controlsExcess) {
+      const controlled = analysis.excess.find((e) => OHANG_CONTROLS_MAP[ohang] === e)!;
+      lines.push(
+        `특히 ${controlled}(${OHANG_HANJA[controlled]}) 기운이 과다한 사주에서 ${ohang}(${OHANG_HANJA[ohang]})은 그것을 제어하는 역할을 해요. 이 균형추가 빠져 있어서 과다한 기운이 더 날뛰기 쉬운 상태예요. ${ohang} 기운을 보충하면 전체적인 밸런스가 크게 개선될 수 있어요.`,
+      );
+    } else {
+      lines.push(
+        `현재 ${excessNames} 기운이 과다한 상태인데, ${ohang}(${OHANG_HANJA[ohang]}) 기운까지 부족하니 전체 밸런스가 한쪽으로 기울어 있어요. 부족한 기운을 의식적으로 채워주면 기울어진 균형이 잡혀갈 수 있어요.`,
+      );
+    }
+  }
+
+  // 3. 기본 설명 추가
+  lines.push(OHANG_LACKING_DESC[ohang]);
+
+  return {
+    headline,
+    detail: lines.join(' '),
+    tips: OHANG_ACTION_TIPS[ohang],
+  };
+}

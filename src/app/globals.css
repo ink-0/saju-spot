@@ -3,19 +3,26 @@
 :root {
   --font-inter: 'Inter', sans-serif;
   --font-noto-serif-kr: 'Noto Serif KR', serif;
+  --app-bg: #ffffff;
+  --app-text: #171717;
+  --app-muted: #6f6a63;
+  --app-border: #ece8e1;
+  --app-surface: rgba(255, 255, 255, 0.92);
+  --app-surface-strong: #ffffff;
+  --app-shadow: 0 24px 60px rgba(31, 24, 17, 0.08);
 }
 
 /* Scrollbar */
 ::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: #0a0a0f; }
-::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+::-webkit-scrollbar-track { background: #f3efe8; }
+::-webkit-scrollbar-thumb { background: #d2cbc1; border-radius: 3px; }
 
 /* Smooth scroll */
 html { scroll-behavior: smooth; }
 
 /* Gradient text utility */
 .gradient-text {
-  background: linear-gradient(135deg, #f59e0b, #ef4444, #8b5cf6);
+  background: linear-gradient(135deg, #f29e3d, #e8715f, #8f9c7b);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -23,10 +30,10 @@ html { scroll-behavior: smooth; }
 
 /* Animated gradient background */
 .gradient-bg {
-  background: radial-gradient(ellipse at 20% 20%, rgba(139, 92, 246, 0.15) 0%, transparent 50%),
-              radial-gradient(ellipse at 80% 80%, rgba(239, 68, 68, 0.1) 0%, transparent 50%),
-              radial-gradient(ellipse at 50% 50%, rgba(16, 185, 129, 0.05) 0%, transparent 70%),
-              #0a0a0f;
+  background:
+    radial-gradient(circle at top right, rgba(246, 240, 225, 0.95), transparent 34%),
+    radial-gradient(circle at left 20%, rgba(247, 245, 240, 0.9), transparent 26%),
+    linear-gradient(180deg, #ffffff 0%, #f8f5ef 100%);
 }
 
 /* Card glow animation */
@@ -72,7 +79,7 @@ html { scroll-behavior: smooth; }
 }
 
 .shimmer {
-  background: linear-gradient(90deg, #1a1a2e 25%, #2a2a3e 50%, #1a1a2e 75%);
+  background: linear-gradient(90deg, #f4efe8 25%, #ffffff 50%, #f4efe8 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
 }
@@ -83,8 +90,8 @@ html { scroll-behavior: smooth; }
 }
 
 .spinner {
-  border: 3px solid rgba(255,255,255,0.1);
-  border-top-color: #f59e0b;
+  border: 3px solid rgba(36, 30, 25, 0.08);
+  border-top-color: #d69348;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -100,7 +107,168 @@ html { scroll-behavior: smooth; }
 
 /* Glass morphism */
 .glass {
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.78);
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(232, 226, 217, 0.9);
+  box-shadow: var(--app-shadow);
+}
+
+body {
+  background: var(--app-bg);
+  color: var(--app-text);
+  min-width: 320px;
+}
+
+.landing-shell {
+  background:
+    radial-gradient(circle at top right, rgba(246, 240, 225, 0.62), transparent 30%),
+    radial-gradient(circle at left 24%, rgba(248, 247, 242, 0.82), transparent 26%),
+    linear-gradient(180deg, #ffffff 0%, #fcfaf6 100%);
+}
+
+.landing-panel {
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid #ece8e1;
+  box-shadow: 0 18px 40px rgba(40, 31, 20, 0.05);
+}
+
+.landing-input,
+.landing-select,
+.landing-time-display {
+  background: #ffffff;
+  border: 1px solid #e9e4db;
+  color: #171717;
+}
+
+.landing-inline-input {
+  border: 0;
+  background: transparent;
+  color: #23211f;
+  font: inherit;
+  outline: none;
+  padding: 0;
+}
+
+.landing-inline-input::placeholder {
+  color: #c0b8af;
+}
+
+.landing-time-minimal::placeholder {
+  color: #b8b0a7;
+}
+
+.landing-input::placeholder {
+  color: #b0a79b;
+}
+
+.landing-input::-webkit-outer-spin-button,
+.landing-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.landing-input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+.landing-inline-input::-webkit-outer-spin-button,
+.landing-inline-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.landing-inline-input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+.landing-input:focus,
+.landing-select:focus,
+.landing-time-display:focus {
+  outline: none;
+  border-color: #d8b278;
+  box-shadow: 0 0 0 4px rgba(219, 179, 113, 0.12);
+}
+
+.landing-select {
+  appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #867b70 50%),
+    linear-gradient(135deg, #867b70 50%, transparent 50%);
+  background-position:
+    calc(100% - 22px) calc(50% - 3px),
+    calc(100% - 14px) calc(50% - 3px);
+  background-size: 8px 8px, 8px 8px;
+  background-repeat: no-repeat;
+}
+
+.landing-time-minimal {
+  border: 0;
+  background: transparent;
+  color: #23211f;
+  outline: none;
+  padding: 0;
+}
+
+.toggle-chip {
+  background: #f6f2eb;
+  color: #74695f;
+  border: 1px solid transparent;
+}
+
+.toggle-chip-active {
+  background: linear-gradient(135deg, #f4b35d 0%, #ec8c62 100%);
+  color: #fffdf9;
+  box-shadow: 0 14px 30px rgba(236, 140, 98, 0.28);
+}
+
+.primary-button {
+  background: linear-gradient(135deg, #20201d 0%, #34312d 100%);
+  color: #fffdf9;
+  box-shadow: 0 22px 40px rgba(24, 24, 22, 0.18);
+}
+
+.primary-button:hover {
+  transform: translateY(-1px);
+}
+
+.feature-chip {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #ece8e1;
+  color: #7a7369;
+}
+
+.result-shell {
+  background:
+    radial-gradient(circle at top right, var(--theme-orb), transparent 26%),
+    linear-gradient(180deg, var(--theme-hero-start) 0%, var(--theme-page-bg) 280px, var(--theme-page-bg) 100%);
+  color: var(--theme-text);
+}
+
+.result-card {
+  background: var(--theme-surface);
+  border: 1px solid var(--theme-border);
+  box-shadow: 0 24px 60px var(--theme-shadow);
+}
+
+.result-subcard {
+  background: var(--theme-surface-alt);
+  border: 1px solid color-mix(in srgb, var(--theme-border) 78%, white 22%);
+}
+
+.result-pill {
+  background: var(--theme-pill-bg);
+  color: var(--theme-accent-strong);
+}
+
+.result-soft-accent {
+  background: var(--theme-accent-soft);
+  color: var(--theme-accent-strong);
+}
+
+.result-muted {
+  color: var(--theme-muted);
+}
+
+.result-label {
+  color: color-mix(in srgb, var(--theme-muted) 86%, white 14%);
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function Home() {
@@ -10,10 +10,56 @@ export default function Home() {
   const [year, setYear] = useState('');
   const [month, setMonth] = useState('');
   const [day, setDay] = useState('');
-  const [hourStr, setHourStr] = useState('');   // "HH:MM" 형태
+  const [meridiem, setMeridiem] = useState<'am' | 'pm'>('am');
+  const [hour12, setHour12] = useState('');
+  const [minuteStr, setMinuteStr] = useState('');
   const [unknownTime, setUnknownTime] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const monthInputRef = useRef<HTMLInputElement>(null);
+  const dayInputRef = useRef<HTMLInputElement>(null);
+
+  const sanitizeNumericInput = (value: string, maxLength: number) =>
+    value.replace(/\D/g, '').slice(0, maxLength);
+
+  const handleYearChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const digitsOnly = sanitizeNumericInput(e.target.value, 4);
+    setYear(digitsOnly);
+    if (digitsOnly.length === 4) {
+      monthInputRef.current?.focus();
+    }
+  };
+
+  const handleMonthChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const digitsOnly = sanitizeNumericInput(e.target.value, 2);
+    setMonth(digitsOnly);
+    if (digitsOnly.length === 2) {
+      dayInputRef.current?.focus();
+    }
+  };
+
+  const handleDayChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const digitsOnly = sanitizeNumericInput(e.target.value, 2);
+    setDay(digitsOnly);
+  };
+
+  const toggleCalendarType = () => {
+    setCalendarType((prev) => (prev === 'solar' ? 'lunar' : 'solar'));
+  };
+
+  const toggleMeridiem = () => {
+    setMeridiem((prev) => (prev === 'am' ? 'pm' : 'am'));
+  };
+
+  const handleHour12Change = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const digitsOnly = sanitizeNumericInput(e.target.value, 2);
+    setHour12(digitsOnly);
+  };
+
+  const handleMinuteChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const digitsOnly = sanitizeNumericInput(e.target.value, 2);
+    setMinuteStr(digitsOnly);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,16 +86,19 @@ export default function Home() {
     let minute = 0;
 
     if (!unknownTime) {
-      if (!hourStr || !/^\d{1,2}:\d{2}$/.test(hourStr)) {
-        setError('시간을 HH:MM 형식으로 입력해주세요 (예: 14:30)');
+      if (!hour12 || !minuteStr || hour12.length < 1 || minuteStr.length < 2) {
+        setError('태어난 시간을 입력해주세요');
         return;
       }
-      const [hh, mm] = hourStr.split(':').map(Number);
-      if (hh < 0 || hh > 23 || mm < 0 || mm > 59) {
+      const hh12 = Number(hour12);
+      const mm = Number(minuteStr);
+      if (hh12 < 1 || hh12 > 12 || mm < 0 || mm > 59) {
         setError('올바른 시간을 입력해주세요');
         return;
       }
-      hour = hh;
+      hour = meridiem === 'am'
+        ? (hh12 === 12 ? 0 : hh12)
+        : (hh12 === 12 ? 12 : hh12 + 12);
       minute = mm;
     }
 
@@ -70,173 +119,200 @@ export default function Home() {
   };
 
   return (
-    <main className="gradient-bg min-h-screen flex flex-col items-center justify-center px-4 py-16">
-      {/* Header */}
-      <div className="text-center mb-10 fade-in-up">
-        <div className="float-anim inline-block mb-5">
-          <div className="text-6xl">🌿</div>
+    <main className="landing-shell min-h-screen px-5 py-8">
+      <div className="mx-auto w-full max-w-[390px] rounded-[40px] px-6 pb-10 pt-8 shadow-[0_24px_70px_rgba(31,24,17,0.06)] fade-in-up">
+        <div className="relative overflow-hidden rounded-[30px] pb-2">
+          <div className="absolute -right-8 -top-10 h-[170px] w-[170px] rounded-full bg-[#efede9]" />
+          <div className="absolute right-9 top-14 h-[42px] w-[42px] rounded-full bg-[#fff1d0]" />
+
+          <div className="relative pl-[2px] pt-8">
+            <h1 className="max-w-[260px] text-[28px] font-bold leading-[1.15] tracking-[-0.03em] text-[#21201e]">
+              당신에게 맞는
+              <br />
+              명소를 찾아볼게요
+            </h1>
+            <p className="mt-6 max-w-[270px] text-[14px] leading-[1.55] text-[#7d756d]">
+              생년월일시를 바탕으로 오행을 분석해
+              <br />
+              당신에게 필요한 기운의 장소를 추천합니다.
+            </p>
+          </div>
         </div>
-        <h1 className="text-4xl md:text-5xl font-bold mb-3 leading-tight">
-          <span className="gradient-text">사주풍수</span>
-        </h1>
-        <p className="text-gray-400 text-lg max-w-xs mx-auto leading-relaxed">
-          생년월일시 입력 → 음양오행 분석 →<br />
-          <strong className="text-white">서울 풍수 명소 추천</strong>
-        </p>
-      </div>
 
-      {/* Form */}
-      <div className="glass rounded-3xl p-7 md:p-9 w-full max-w-md fade-in-up fade-in-up-delay-2">
-        <form onSubmit={handleSubmit} className="space-y-5">
 
-          {/* 양력 / 음력 토글 */}
-          <div>
-            <label className="block text-xs text-gray-500 mb-2 font-medium tracking-wide uppercase">달력 종류</label>
-            <div className="grid grid-cols-2 gap-2">
-              {(['solar', 'lunar'] as const).map((type) => (
-                <button
-                  key={type}
-                  type="button"
-                  onClick={() => setCalendarType(type)}
-                  className={`py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                    calendarType === type
-                      ? 'bg-amber-500 text-black'
-                      : 'bg-white/5 text-gray-400 hover:bg-white/10'
-                  }`}
-                >
-                  {type === 'solar' ? '☀️ 양력' : '🌙 음력'}
-                </button>
-              ))}
-            </div>
 
-            {/* 윤달 체크 (음력일 때만) */}
-            {calendarType === 'lunar' && (
-              <label className="flex items-center gap-2 mt-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={isLeapMonth}
-                  onChange={(e) => setIsLeapMonth(e.target.checked)}
-                  className="w-4 h-4 accent-amber-500"
+        <form onSubmit={handleSubmit} className="mt-8">
+          <div className="flex items-start justify-between gap-3">
+            <h2 className="text-[18px] font-bold tracking-[-0.03em] text-[#23211f]">사주 정보 입력</h2>
+            <div className="flex flex-col items-end gap-2">
+              <div className="relative inline-grid grid-cols-2 overflow-hidden rounded-full bg-[#f4f1eb] p-[3px] cursor-pointer">
+                <div
+                  aria-hidden="true"
+                  className={`pointer-events-none absolute inset-y-[3px] left-[3px] w-[calc(50%-0.1875rem)] rounded-full bg-[#232220] shadow-[0_5px_12px_rgba(35,34,32,0.16)] transition-transform duration-300 ease-out ${calendarType === 'lunar' ? 'translate-x-full' : 'translate-x-0'
+                    }`}
                 />
-                <span className="text-sm text-gray-400">윤달로 태어났어요</span>
-              </label>
-            )}
-          </div>
-
-          {/* 연도 */}
-          <div>
-            <label className="block text-xs text-gray-500 mb-2 font-medium tracking-wide uppercase">생년</label>
-            <input
-              type="number"
-              placeholder="예: 1995"
-              value={year}
-              onChange={(e) => setYear(e.target.value)}
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder-gray-600 focus:outline-none focus:border-amber-500/60 transition-all text-lg"
-              min="1900"
-              max="2026"
-            />
-          </div>
-
-          {/* 월 / 일 */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs text-gray-500 mb-2 font-medium tracking-wide uppercase">월</label>
-              <select
-                value={month}
-                onChange={(e) => setMonth(e.target.value)}
-                className="w-full bg-[#111118] border border-white/10 rounded-xl px-4 py-3.5 text-white focus:outline-none focus:border-amber-500/60 transition-all"
-              >
-                <option value="">월</option>
-                {Array.from({ length: 12 }, (_, i) => (
-                  <option key={i + 1} value={i + 1}>{i + 1}월</option>
+                {(['solar', 'lunar'] as const).map((type) => (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={toggleCalendarType}
+                    aria-pressed={calendarType === type}
+                    className={`relative z-10 cursor-pointer rounded-full px-4 py-1.5 text-[12px] font-semibold transition-colors duration-300 ${calendarType === type
+                      ? 'text-white'
+                      : 'text-[#8d847a]'
+                      }`}
+                  >
+                    {type === 'solar' ? '양력' : '음력'}
+                  </button>
                 ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs text-gray-500 mb-2 font-medium tracking-wide uppercase">일</label>
-              <select
-                value={day}
-                onChange={(e) => setDay(e.target.value)}
-                className="w-full bg-[#111118] border border-white/10 rounded-xl px-4 py-3.5 text-white focus:outline-none focus:border-amber-500/60 transition-all"
-              >
-                <option value="">일</option>
-                {Array.from({ length: 31 }, (_, i) => (
-                  <option key={i + 1} value={i + 1}>{i + 1}일</option>
-                ))}
-              </select>
+              </div>
             </div>
           </div>
 
-          {/* 시간 입력 */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-xs text-gray-500 font-medium tracking-wide uppercase">태어난 시간</label>
-              <label className="flex items-center gap-1.5 cursor-pointer">
+          <div className="mt-5 space-y-3.5">
+            <div className="landing-panel rounded-[28px] px-6 py-4">
+              <div className="flex items-center justify-between gap-2">
+                <label className="block text-[12px] font-medium text-[#9a9085]">생년월일</label>
+                {calendarType === 'lunar' && (
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={isLeapMonth}
+                      onChange={(e) => setIsLeapMonth(e.target.checked)}
+                      className="w-3.5 h-3.5 accent-[#d69750]"
+                    />
+                    <span className="text-[10px] text-[#9a9085]">윤달</span>
+                  </label>
+                )}
+              </div>
+              <div className="mt-2 flex items-center gap-0 text-[16px] font-bold text-[#23211f]">
                 <input
-                  type="checkbox"
-                  checked={unknownTime}
-                  onChange={(e) => setUnknownTime(e.target.checked)}
-                  className="w-3.5 h-3.5 accent-amber-500"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  placeholder="1997"
+                  value={year}
+                  onChange={handleYearChange}
+                  className="landing-inline-input w-[50px]"
+                  maxLength={4}
                 />
-                <span className="text-xs text-gray-500">시간 몰라요</span>
-              </label>
+                <span className="mx-[1px]">.</span>
+                <input
+                  ref={monthInputRef}
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  placeholder="02"
+                  value={month}
+                  onChange={handleMonthChange}
+                  className="landing-inline-input w-[28px]"
+                  maxLength={2}
+                />
+                <span className="mx-[1px]">.</span>
+                <input
+                  ref={dayInputRef}
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  placeholder="27"
+                  value={day}
+                  onChange={handleDayChange}
+                  className="landing-inline-input w-[28px]"
+                  maxLength={2}
+                />
+              </div>
             </div>
 
-            {!unknownTime ? (
-              <div className="space-y-2">
-                <input
-                  type="time"
-                  value={hourStr}
-                  onChange={(e) => setHourStr(e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-white focus:outline-none focus:border-amber-500/60 transition-all text-lg [color-scheme:dark]"
-                />
-                <p className="text-xs text-gray-600">
-                  💡 진태양시 보정 자동 적용 (서울 기준 -32분)
-                </p>
+            <div className="grid grid-cols-2 gap-3.5">
+              <div className="landing-panel rounded-[28px] px-6 py-4 col-span-2">
+                <div className="flex items-center justify-between gap-2">
+                  <label className="block text-[12px] font-medium text-[#9a9085]">태어난 시간</label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={unknownTime}
+                      onChange={(e) => setUnknownTime(e.target.checked)}
+                      className="w-3.5 h-3.5 accent-[#d69750]"
+                    />
+                    <span className="text-[10px] text-[#9a9085]">모름</span>
+                  </label>
+                </div>
+                {!unknownTime ? (
+                  <div className="mt-2 flex items-center gap-3">
+                    <div className="relative inline-grid h-[28px] grid-cols-2 overflow-hidden rounded-full bg-[#f4f1eb] p-[2px] cursor-pointer">
+                      <div
+                        aria-hidden="true"
+                        className={`pointer-events-none absolute inset-y-[2px] left-[2px] w-[calc(50%-0.125rem)] rounded-full bg-[#232220] shadow-[0_4px_10px_rgba(35,34,32,0.14)] transition-transform duration-300 ease-out ${
+                          meridiem === 'pm' ? 'translate-x-full' : 'translate-x-0'
+                        }`}
+                      />
+                      <button
+                        type="button"
+                        onClick={toggleMeridiem}
+                        className={`relative z-10 cursor-pointer rounded-full px-2.5 text-[11px] font-semibold leading-none transition-colors duration-300 ${meridiem === 'am' ? 'text-white' : 'text-[#8d847a]'}`}
+                      >
+                        오전
+                      </button>
+                      <button
+                        type="button"
+                        onClick={toggleMeridiem}
+                        className={`relative z-10 cursor-pointer rounded-full px-2.5 text-[11px] font-semibold leading-none transition-colors duration-300 ${meridiem === 'pm' ? 'text-white' : 'text-[#8d847a]'}`}
+                      >
+                        오후
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-1 text-[16px] font-bold text-[#23211f]">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        placeholder="09"
+                        value={hour12}
+                        onChange={handleHour12Change}
+                        className="landing-inline-input w-[28px]"
+                        maxLength={2}
+                      />
+                      <span>:</span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        placeholder="10"
+                        value={minuteStr}
+                        onChange={handleMinuteChange}
+                        className="landing-inline-input w-[28px]"
+                        maxLength={2}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <p className="mt-2 text-[16px] font-bold text-[#23211f]">미입력</p>
+                )}
               </div>
-            ) : (
-              <div className="bg-white/5 rounded-xl px-4 py-3.5 text-gray-500 text-sm">
-                시간 제외하고 계산 (월주·일주 기준 분석)
-              </div>
-            )}
+            </div>
           </div>
 
-          {/* 에러 */}
           {error && (
-            <p className="text-red-400 text-sm bg-red-500/10 rounded-lg px-4 py-2">{error}</p>
+            <p className="mt-4 rounded-2xl border border-[#f2d0ca] bg-[#fff0ee] px-4 py-3 text-sm text-[#c85b54]">{error}</p>
           )}
 
-          {/* 제출 */}
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-4 rounded-xl font-bold text-lg bg-gradient-to-r from-amber-500 to-orange-500 text-black hover:from-amber-400 hover:to-orange-400 transition-all transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-3 shadow-lg shadow-amber-500/20"
+            className="primary-button mt-9 flex w-full cursor-pointer items-center justify-center gap-3 rounded-[999px] py-4 text-[17px] font-bold transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {loading ? (
               <>
-                <div className="spinner w-5 h-5" />
+                <div className="spinner h-5 w-5" />
                 <span>사주 분석 중...</span>
               </>
             ) : (
-              <>
-                <span>✨</span>
-                <span>내 오행 분석하기</span>
-              </>
+              <span>내 사주 분석하기</span>
             )}
           </button>
+
         </form>
       </div>
-
-      {/* Feature chips */}
-      <div className="mt-8 flex flex-wrap justify-center gap-2 max-w-sm fade-in-up fade-in-up-delay-4">
-        {['KASI 절기 데이터', '진태양시 보정', '음력/양력', '서울 풍수 명소'].map((f) => (
-          <span key={f} className="text-xs glass px-3 py-1.5 rounded-full text-gray-400">{f}</span>
-        ))}
-      </div>
-
-      <p className="mt-6 text-xs text-gray-600 text-center">
-        풍수지리·음양오행 전통 이론 기반 참고용 콘텐츠
-      </p>
     </main>
   );
 }

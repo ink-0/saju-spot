@@ -6,6 +6,7 @@ import {
   type SajuResult,
 } from './manseryeok';
 import type { OhangType } from './ohang';
+import { getIljuNarrative, type IljuNarrative } from './ilju-narratives';
 
 export type TenGodType =
   | '비견'
@@ -74,6 +75,12 @@ export interface BranchRelation {
   description: string;
 }
 
+export interface HighlightSection {
+  icon: string;
+  title: string;
+  body: string;
+}
+
 export interface SajuDetailAnalysis {
   dayMaster: {
     stem: Stem;
@@ -83,6 +90,10 @@ export interface SajuDetailAnalysis {
   pillars: SajuPillarDetail[];
   branchRelations: BranchRelation[];
   highlights: string[];
+  /** 구조화된 해석 섹션 (성격, 사회적 모습, 내면, 미래, 밸런스) */
+  structuredHighlights: HighlightSection[];
+  /** 일주 내러티브 */
+  iljuNarrative: IljuNarrative;
 }
 
 export interface TenGodUiMeta {
@@ -104,6 +115,7 @@ export interface PillarConversationUi {
 
 export interface SimpleSajuSummary {
   title: string;
+  metaphor: string;
   lines: [string, string];
 }
 
@@ -257,12 +269,16 @@ export function analyzeSajuDetails(saju: SajuResult): SajuDetailAnalysis {
 
   const branchRelations = findBranchRelations(pillars.map((pillar) => ({ label: pillar.label, branch: pillar.branch })));
   const highlights = buildHighlights(dayMaster, pillars, branchRelations);
+  const iljuNarrative = getIljuNarrative(saju.dayPillar);
+  const structuredHighlights = buildStructuredHighlights(dayMaster, pillars, branchRelations, iljuNarrative);
 
   return {
     dayMaster,
     pillars,
     branchRelations,
     highlights,
+    structuredHighlights,
+    iljuNarrative,
   };
 }
 
@@ -340,6 +356,7 @@ export function getSimpleSajuSummary(detail: SajuDetailAnalysis): SimpleSajuSumm
   const monthPillar = detail.pillars.find((pillar) => pillar.key === 'month');
   const dayPillar = detail.pillars.find((pillar) => pillar.key === 'day');
   const hourPillar = detail.pillars.find((pillar) => pillar.key === 'hour');
+  const { iljuNarrative } = detail;
 
   const socialTone = monthPillar
     ? getStemTenGodUi(monthPillar.stemTenGod).headline
@@ -353,11 +370,12 @@ export function getSimpleSajuSummary(detail: SajuDetailAnalysis): SimpleSajuSumm
 
   return {
     title: `${detail.dayMaster.stem}${detail.dayMaster.hanja} 일간 · ${detail.dayMaster.ohang} 기운 중심`,
+    metaphor: iljuNarrative.metaphor,
     lines: [
-      `겉으로는 ${socialTone} 쪽으로 보이지만, 속으로는 ${innerTone} 같은 결이 중심에 깔려 있어요.`,
+      `겉으로는 ${socialTone} 쪽으로 보이지만, 안으로는 ${innerTone} 같은 결이 중심을 잡고 있어요.`,
       laterTone
-        ? `시간이 갈수록 ${laterTone} 같은 면이 더 또렷해질 가능성이 커요.`
-        : '전체적으로는 자기 리듬을 지키는 쪽이 편한 타입으로 읽혀요.',
+        ? `시간이 지날수록 ${laterTone} 같은 면이 더 뚜렷하게 드러날 수 있어요.`
+        : '전체적으로는 자기만의 리듬을 지키며 나아가는 것이 가장 편한 타입으로 읽혀요.',
     ],
   };
 }
@@ -490,35 +508,123 @@ function buildHighlights(
   const resourceCount = pillars.filter((pillar) => getTenGod(dayMaster.stem, pillar.stem) === '정인' || getTenGod(dayMaster.stem, pillar.stem) === '편인').length;
 
   const highlights = [
-    `일간은 ${dayMaster.stem}${dayMaster.hanja}(${dayMaster.ohang})로, 내 성향을 읽을 때 가장 먼저 보는 중심축이에요.`,
+    `일간은 ${dayMaster.stem}(${dayMaster.ohang})로, 내 성향을 읽을 때 가장 먼저 보는 중심축이에요.`,
   ];
 
   if (monthPillar) {
     const monthStemMeaning = getStemTenGodUi(monthPillar.stemTenGod);
-    highlights.push(`사람들이 보는 너의 첫인상이나 사회생활 쪽에서는 ${monthStemMeaning.headline} 같은 분위기가 잘 보여요. 일할 때나 현실 감각에서도 이쪽 결이 자주 드러나는 편이에요.`);
+    highlights.push(`사회에서 보이는 모습은 ${monthStemMeaning.headline} 쪽으로 드러나기 쉬워요.`);
   }
 
   if (dayPillar) {
     const dayBranchMeaning = getBranchTenGodUi(dayPillar.branchTenGod);
-    highlights.push(`진짜 성격 중심을 보면, 기본적으로는 ${dayMaster.ohang} 기운을 바탕으로 움직이면서 속에서는 ${dayBranchMeaning.headline} 같은 반응이 꽤 중요한 축으로 깔려 있어요.`);
+    highlights.push(`진짜 성격의 중심은 ${dayMaster.ohang} 기운 위에 ${dayBranchMeaning.headline} 같은 결이 깔려 있어요.`);
   }
 
   if (hourPillar) {
     const hourMeaning = getBranchTenGodUi(hourPillar.branchTenGod);
-    highlights.push(`겉으로는 안 보여도 속마음이나 시간이 지나며 더 뚜렷해지는 부분은 ${hourMeaning.headline} 쪽일 가능성이 커요. 혼자 있을 때 이 결이 더 잘 느껴질 수 있어요.`);
+    highlights.push(`시간이 지날수록 ${hourMeaning.headline} 쪽의 면이 더 또렷해질 가능성이 있어요.`);
   }
 
   if (supportCount >= 2 || resourceCount >= 2) {
-    highlights.push('전체적으로는 내 색을 밀고 가는 힘이 꽤 있는 편이라, 한번 방향을 잡으면 생각보다 쉽게 흔들리지는 않는 타입에 가까워 보여요.');
+    highlights.push('자기 색을 밀고 가는 힘이 있어서, 방향을 잡으면 쉽게 흔들리지 않는 타입이에요.');
   } else {
-    highlights.push('반대로 혼자만의 힘으로 밀어붙이기보다는, 환경이나 타이밍을 잘 만나야 훨씬 편하게 풀리는 타입으로 읽혀요.');
+    highlights.push('환경과 타이밍을 잘 만나야 편하게 풀리는 타입이에요.');
   }
 
   if (relations.length > 0) {
-    highlights.push('관계나 환경이 한 번 바뀔 때 생각보다 크게 체감하는 편이라, 흐름이 바뀌는 시기에는 컨디션 영향을 더 받을 수 있어 보여요.');
+    highlights.push('사주 안에 충·합·형이 있어서, 흐름이 바뀌는 시기에 변화를 크게 체감할 수 있어요.');
   } else {
-    highlights.push('사주 구조가 아주 복잡하게 충돌하는 편은 아니라서, 큰 변수보다 기본 성향이 꾸준히 이어지는 쪽에 더 가까워 보여요.');
+    highlights.push('사주 구조가 비교적 안정적이라, 기본 성향이 꾸준히 이어지는 편이에요.');
   }
 
   return highlights;
+}
+
+/* ─────────── 구조화 해석 (스토리텔링) ─────────── */
+
+function buildStructuredHighlights(
+  dayMaster: SajuDetailAnalysis['dayMaster'],
+  pillars: SajuPillarDetail[],
+  relations: BranchRelation[],
+  iljuNarrative: IljuNarrative,
+): HighlightSection[] {
+  const monthPillar = pillars.find((p) => p.key === 'month');
+  const dayPillar = pillars.find((p) => p.key === 'day');
+  const hourPillar = pillars.find((p) => p.key === 'hour');
+  const supportCount = pillars.filter((p) => p.stemOhang === dayMaster.ohang).length;
+  const resourceCount = pillars.filter((p) => {
+    const tenGod = getTenGod(dayMaster.stem, p.stem);
+    return tenGod === '정인' || tenGod === '편인';
+  }).length;
+
+  const sections: HighlightSection[] = [];
+
+  /* ── 1. 나는 어떤 사람일까 ── */
+  sections.push({
+    icon: '✨',
+    title: '나는 어떤 사람일까',
+    body: iljuNarrative.narrative,
+  });
+
+  /* ── 2. 사회에서 보이는 나 ── */
+  if (monthPillar) {
+    const stemMeta = getStemTenGodUi(monthPillar.stemTenGod);
+    const isSameAsDay = monthPillar.stemTenGod === '비견' || monthPillar.stemTenGod === '겁재';
+
+    let socialBody: string;
+    if (isSameAsDay) {
+      socialBody = `직장이나 사회에서도 자기 색을 또렷하게 드러내는 편이에요. ${stemMeta.description} 주변에서 "좋든 싫든 존재감이 확실한 사람"이라는 인상을 받기 쉬워요.`;
+    } else {
+      socialBody = `사람들 사이에서는 ${stemMeta.headline} 같은 분위기가 먼저 읽혀요. ${stemMeta.description}`;
+    }
+
+    sections.push({
+      icon: '🏢',
+      title: '사회에서 보이는 나',
+      body: socialBody,
+    });
+  }
+
+  /* ── 3. 내면의 진짜 모습 ── */
+  if (dayPillar) {
+    const dayBranch = getBranchTenGodUi(dayPillar.branchTenGod);
+
+    sections.push({
+      icon: '💭',
+      title: '내면의 진짜 모습',
+      body: `겉으로 보이는 모습과 달리, 안쪽에서는 ${dayBranch.headline} 같은 반응이 중심에 자리 잡고 있어요. ${dayBranch.description}`,
+    });
+  }
+
+  /* ── 4. 시간이 지나면 ── */
+  if (hourPillar) {
+    const hourStemMeta = getStemTenGodUi(hourPillar.stemTenGod);
+    const hourBranchMeta = getBranchTenGodUi(hourPillar.branchTenGod);
+
+    sections.push({
+      icon: '🔮',
+      title: '시간이 지나면',
+      body: `나이가 들수록 ${hourStemMeta.headline} 쪽으로 힘이 더 실리게 될 거예요. ${hourStemMeta.description} 안으로는 ${hourBranchMeta.headline} 같은 에너지가 쌓여 있어서, 혼자 있을 때 이 면이 더 잘 느껴질 수 있어요.`,
+    });
+  }
+
+  /* ── 5. 사주의 힘 밸런스 ── */
+  {
+    const isDayMasterStrong = supportCount >= 2 || resourceCount >= 2;
+    let powerBody: string;
+    if (isDayMasterStrong) {
+      powerBody = '나를 도와주는 기운이 충분한 편이에요. 자기 색을 밀고 나가는 힘이 있어서, 한번 결심하면 쉽게 흔들리지 않아요. 다만 그 단단함이 때로는 고집으로 보일 수 있으니, 부족한 기운을 의식적으로 채워주면 균형이 더 좋아질 거예요.';
+    } else {
+      powerBody = '나를 직접 도와주는 기운이 적은 편이에요. 혼자 힘으로 밀어붙이기보다는, 좋은 환경과 사람을 만났을 때 크게 빛나는 타입이에요. 나에게 맞는 장소와 분위기를 찾는 것이 특히 중요한 사주예요.';
+    }
+
+    sections.push({
+      icon: '⚖️',
+      title: '사주의 힘 밸런스',
+      body: powerBody,
+    });
+  }
+
+  return sections;
 }
